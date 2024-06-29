@@ -94,8 +94,9 @@ def reset_kills():
 
 def multi_kill_expired():
     """Set the multi-kill window to expired."""
-    global MULTI_KILL_EXPIRED
+    global MULTI_KILL_COUNT, MULTI_KILL_EXPIRED
     logger.debug(colored("Multi-kill window expired.", "cyan"))
+    logger.info(colored(f"Multi-kills during window: {MULTI_KILL_COUNT-1}", "yellow"))
     MULTI_KILL_EXPIRED = True
 
 
@@ -125,8 +126,8 @@ def handle_kill():
         if LAST_KILL_TIME and not MULTI_KILL_EXPIRED:
             multi_kill_expired()
         MULTI_KILL_COUNT = 1
+        KILL_COUNT += 1
 
-    KILL_COUNT += 1
     LAST_KILL_TIME = now
     MULTI_KILL_EXPIRED = False
 
