@@ -59,7 +59,7 @@ START_TIME = datetime.now()
 MULTI_KILL_EXPIRED = False
 
 # Audio threshold for detecting loud sounds (like a zap)
-TEST_THRESHOLD = 0.1
+TEST_THRESHOLD = 0.05
 TRIGGER_THRESHOLD = 0.2
 SAMPLE_RATE = 44100
 SAMPLE_DURATION = 0.1  # Duration of each audio sample in seconds
@@ -73,14 +73,13 @@ def get_key():
     """Read a single keypress from the user."""
     if os.name == "nt":
         return msvcrt.getch().decode("utf-8")
-    else:
-        fd = sys.stdin.fileno()
-        old_settings = termios.tcgetattr(fd)
-        try:
-            tty.setraw(fd)
-            return sys.stdin.read(1)
-        finally:
-            termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+    fd = sys.stdin.fileno()
+    old_settings = termios.tcgetattr(fd)
+    try:
+        tty.setraw(fd)
+        return sys.stdin.read(1)
+    finally:
+        termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
 
 
 def reset_at_midnight():
@@ -141,9 +140,8 @@ def check_multi_kill_window():
     """Check if the multi-kill window has expired."""
     global MULTI_KILL_EXPIRED, LAST_KILL_TIME
     now = datetime.now()
-    if LAST_KILL_TIME and now - LAST_KILL_TIME > MULTI_KILL_WINDOW:
-        if not MULTI_KILL_EXPIRED:
-            multi_kill_window_expired()
+    if LAST_KILL_TIME and now - LAST_KILL_TIME > MULTI_KILL_WINDOW and not MULTI_KILL_EXPIRED:
+        multi_kill_window_expired()
 
 
 def handle_kill():
@@ -160,7 +158,9 @@ def handle_kill():
     if LAST_KILL_TIME and now - LAST_KILL_TIME <= MULTI_KILL_WINDOW:
         MULTI_KILL_COUNT += 1
         multi_kill_occurred = True
-        if MULTI_KILL_COUNT in [sound[2] for sound in MULTI_KILL_SOUNDS]:
+        if MULTI_KILL_COUNT > 5:
+            play_sound(HEADSHOT_SOUND, "Headshot!")
+        elif MULTI_KILL_COUNT in [sound[2] for sound in MULTI_KILL_SOUNDS]:
             sound = next(filter(lambda x: x[2] == MULTI_KILL_COUNT, MULTI_KILL_SOUNDS))
             play_sound(sound[1], sound[0])
     else:
