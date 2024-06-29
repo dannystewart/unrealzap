@@ -3,6 +3,7 @@
 import logging
 import os
 import sys
+import threading
 import time
 from datetime import datetime, timedelta
 
@@ -20,7 +21,7 @@ else:
 # Set up logger
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
-handler = logging.StreamHandler()
+handler = logging.StreamHandler(sys.stdout)
 formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
 handler.setFormatter(formatter)
 logger.addHandler(handler)
@@ -95,8 +96,12 @@ def reset_kills():
 def multi_kill_expired():
     """Set the multi-kill window to expired."""
     global MULTI_KILL_COUNT, MULTI_KILL_EXPIRED
-    logger.debug(colored("Multi-kill window expired.", "cyan"))
-    logger.info(colored(f"Multi-kills during window: {MULTI_KILL_COUNT-1}", "yellow"))
+    multi_kills = MULTI_KILL_COUNT - 1
+    count_text = colored(
+        f"{multi_kills} kill{'s' if multi_kills != 1 else ''}", f"{'yellow' if multi_kills > 0 else 'cyan'}"
+    )
+    expired_text = colored(f"Multi-kill window expired after {count_text}.", "cyan")
+    logger.info("%s\r", expired_text)
     MULTI_KILL_EXPIRED = True
 
 
@@ -157,7 +162,6 @@ def main():
     """Start the audio stream and handle the logic."""
     logger.info(colored("Started bug zapper kill streak tracker.", "green"))
     if TEST_MODE:
-        import threading
 
         def check_expirations():
             while True:
