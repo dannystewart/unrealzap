@@ -199,6 +199,18 @@ def audio_callback(indata, frames, time, status):  # noqa: ARG001
         handle_kill()
 
 
+def find_valid_sample_rate(device_info, sample_rates=(44100, 48000)):
+    """Find the first valid sample rate that works with the device."""
+    for rate in sample_rates:
+        try:
+            sd.check_input_settings(device=device_info["index"], samplerate=rate)
+            logger.debug("Valid sample rate found: %s", rate)
+            return rate
+        except Exception as e:
+            logger.warning("Sample rate %s not supported: %s", rate, str(e))
+    raise ValueError("No valid sample rates found.")
+
+
 def main():
     """Start the audio stream and handle the logic."""
     logger.info("Started bug zapper kill streak tracker.")
@@ -225,15 +237,21 @@ def main():
     else:
         midnight_reset_thread = threading.Thread(target=reset_at_midnight, daemon=True)
         midnight_reset_thread.start()
+
         try:
             device_info = sd.query_devices(INPUT_DEVICE_INDEX, "input")
             logger.debug("Using device: %s", device_info)
+
+            hostapi_info = sd.query_hostapis()
+            logger.debug("Using host API: %s", hostapi_info)
+
+            sample_rate = find_valid_sample_rate(device_info)
             with sd.InputStream(
                 device=INPUT_DEVICE_INDEX,
-                samplerate=device_info["default_samplerate"],
+                samplerate=sample_rate,
                 callback=audio_callback,
                 channels=1,
-                blocksize=int(device_info["default_samplerate"] * SAMPLE_DURATION),
+                blocksize=int(sample_rate * SAMPLE_DURATION),
                 dtype="float32",
             ):
                 logger.info("Audio stream started successfully.")
