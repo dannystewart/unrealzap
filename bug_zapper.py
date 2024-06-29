@@ -80,10 +80,10 @@ def handle_kill():
     KILL_COUNT += 1
     LAST_KILL_TIME = now
 
-    if KILL_COUNT > 6:
-        play_sound(HEADSHOT_SOUND, "Headshot!")
-    elif not multi_kill_occurred:
-        if KILL_COUNT in [sound[2] for sound in KILL_SOUNDS]:
+    if not multi_kill_occurred:
+        if KILL_COUNT > 6:
+            play_sound(HEADSHOT_SOUND, "Headshot!")
+        elif KILL_COUNT in [sound[2] for sound in KILL_SOUNDS]:
             sound = next(filter(lambda x: x[2] == KILL_COUNT, KILL_SOUNDS))
             play_sound(sound[1], sound[0])
 
