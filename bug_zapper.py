@@ -7,11 +7,15 @@ from datetime import datetime, timedelta
 import numpy as np
 import pygame
 import sounddevice as sd
+from termcolor import colored
 
-# Get logger
+# Set up logger
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
-logger.addHandler(logging.StreamHandler())
+handler = logging.StreamHandler()
+formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
+handler.setFormatter(formatter)
+logger.addHandler(handler)
 
 # Kill sounds and corresponding thresholds
 KILL_SOUNDS = [
@@ -48,7 +52,7 @@ MULTI_KILL_EXPIRED = False
 
 def play_sound(file, label):
     """Play the sound file and log the event."""
-    logger.debug("- Playing sound: %s", label)
+    logger.debug(colored(f"Playing sound: {label}", "blue"))
     pygame.mixer.music.load(file)
     pygame.mixer.music.play()
     while pygame.mixer.music.get_busy():
@@ -72,7 +76,7 @@ def check_multi_kill_window():
     now = datetime.now()
     if LAST_KILL_TIME and now - LAST_KILL_TIME > MULTI_KILL_WINDOW:
         if not MULTI_KILL_EXPIRED:
-            logger.debug("- Multi-kill window expired.")
+            logger.debug("Multi-kill window expired.")
             MULTI_KILL_EXPIRED = True
 
 
@@ -91,7 +95,7 @@ def handle_kill():
             play_sound(sound[1], sound[0])
     else:
         if LAST_KILL_TIME and not MULTI_KILL_EXPIRED:
-            logger.debug("- Multi-kill window expired.")
+            logger.debug("Multi-kill window expired.")
             MULTI_KILL_EXPIRED = True
         MULTI_KILL_COUNT = 1
 
@@ -106,7 +110,7 @@ def handle_kill():
             sound = next(filter(lambda x: x[2] == KILL_COUNT, KILL_SOUNDS))
             play_sound(sound[1], sound[0])
 
-    logger.debug("- Total kills so far: %s\n", KILL_COUNT)
+    logger.debug(colored(f"Total kills so far: {KILL_COUNT}", "yellow"))
 
 
 def audio_callback(indata, status):
@@ -123,7 +127,7 @@ def audio_callback(indata, status):
 
 def main():
     """Start the audio stream and handle the logic."""
-    logger.info("Started bug zapper kill streak tracker.")
+    logger.info(colored("Started bug zapper kill streak tracker.", "green"))
     if TEST_MODE:
         import threading
 
@@ -137,7 +141,9 @@ def main():
         expiration_thread.start()
 
         while True:
-            input("Press Enter to simulate a zap.\n")
+            logger.info(colored("Press Enter to simulate a zap.", "green"))
+            input()
+            logger.debug(colored("Zap!", "cyan"))
             handle_kill()
     else:
         with sd.InputStream(callback=audio_callback):
