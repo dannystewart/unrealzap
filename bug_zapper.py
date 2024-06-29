@@ -46,6 +46,9 @@ MULTI_KILL_SOUNDS = [
 
 HEADSHOT_SOUND = "sounds/headshot.wav"
 
+# Set input device index for the correct audio device
+INPUT_DEVICE_INDEX = 2
+
 # Set TEST_MODE to True for testing mode (manual trigger)
 TEST_MODE = False
 pygame.mixer.init()
@@ -228,6 +231,7 @@ def main():
             device_info = sd.query_devices(kind="input")
             logger.debug("Using device: %s", device_info)
             with sd.InputStream(
+                device=INPUT_DEVICE_INDEX,  # Specify the input device
                 callback=audio_callback,
                 channels=1,
                 samplerate=SAMPLE_RATE,
