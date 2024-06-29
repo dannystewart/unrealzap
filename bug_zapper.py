@@ -58,6 +58,11 @@ KILL_RESET_TIME = timedelta(minutes=1) if TEST_MODE else timedelta(hours=24)
 START_TIME = datetime.now()
 MULTI_KILL_EXPIRED = False
 
+# Audio threshold for detecting loud sounds (like a zap)
+AUDIO_THRESHOLD = 0.5
+SAMPLE_RATE = 44100
+SAMPLE_DURATION = 0.1  # Duration of each audio sample in seconds
+
 
 def get_key():
     """Read a single keypress from the user."""
@@ -151,16 +156,17 @@ def audio_callback(indata, status):
     if status:
         logger.debug(status, flush=True)
 
-    volume_norm = np.linalg.norm(indata) * 10
-    threshold = 0.1
-
-    if volume_norm > threshold:
+    # Calculate RMS (root mean square) to detect loud bursts of sound
+    volume = np.sqrt(np.mean(indata**2))
+    if volume > AUDIO_THRESHOLD:
+        logger.debug(colored("Zap detected!", "red"))
         handle_kill()
 
 
 def main():
     """Start the audio stream and handle the logic."""
     logger.info(colored("Started bug zapper kill streak tracker.", "green"))
+
     if TEST_MODE:
 
         def check_expirations():
@@ -182,7 +188,13 @@ def main():
                 print(colored("Exiting.", "green"))
                 sys.exit(0)
     else:
-        with sd.InputStream(callback=audio_callback):
+        with sd.InputStream(
+            callback=audio_callback,
+            channels=1,
+            samplerate=SAMPLE_RATE,
+            blocksize=int(SAMPLE_RATE * SAMPLE_DURATION),
+            dtype="float32",
+        ):
             while True:
                 try:
                     check_multi_kill_window()
