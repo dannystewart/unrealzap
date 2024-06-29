@@ -1,11 +1,17 @@
 """Bug zapper kill streak tracker."""
 
+import logging
 import time
 from datetime import datetime, timedelta
 
 import numpy as np
 import pygame
 import sounddevice as sd
+
+# Get logger
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
+logger.addHandler(logging.StreamHandler())
 
 # Kill sounds and corresponding thresholds
 KILL_SOUNDS = [
@@ -37,11 +43,12 @@ MULTI_KILL_COUNT = 0
 MULTI_KILL_WINDOW = timedelta(seconds=3) if TEST_MODE else timedelta(minutes=2)
 KILL_RESET_TIME = timedelta(minutes=1) if TEST_MODE else timedelta(hours=24)
 START_TIME = datetime.now()
+MULTI_KILL_EXPIRED = False
 
 
 def play_sound(file, label):
     """Play the sound file and log the event."""
-    print(f"Playing sound: {label}")
+    logger.debug("- Playing sound: %s", label)
     pygame.mixer.music.load(file)
     pygame.mixer.music.play()
     while pygame.mixer.music.get_busy():
@@ -53,15 +60,25 @@ def reset_kills():
     global KILL_COUNT, LAST_KILL_TIME, START_TIME
     now = datetime.now()
     if now - START_TIME >= KILL_RESET_TIME:
-        print("Overall timer reset.")
+        logger.info("Cumulative kill timer reset.")
         KILL_COUNT = 0
         LAST_KILL_TIME = None
         START_TIME = now
 
 
+def check_multi_kill_window():
+    """Check if the multi-kill window has expired."""
+    global MULTI_KILL_EXPIRED, LAST_KILL_TIME
+    now = datetime.now()
+    if LAST_KILL_TIME and now - LAST_KILL_TIME > MULTI_KILL_WINDOW:
+        if not MULTI_KILL_EXPIRED:
+            logger.debug("- Multi-kill window expired.")
+            MULTI_KILL_EXPIRED = True
+
+
 def handle_kill():
     """Handle a single kill event."""
-    global KILL_COUNT, LAST_KILL_TIME, MULTI_KILL_COUNT
+    global KILL_COUNT, LAST_KILL_TIME, MULTI_KILL_COUNT, MULTI_KILL_EXPIRED
 
     now = datetime.now()
     multi_kill_occurred = False
@@ -73,12 +90,14 @@ def handle_kill():
             sound = next(filter(lambda x: x[2] == MULTI_KILL_COUNT, MULTI_KILL_SOUNDS))
             play_sound(sound[1], sound[0])
     else:
-        if LAST_KILL_TIME:
-            print("Multi-kill window expired.")
+        if LAST_KILL_TIME and not MULTI_KILL_EXPIRED:
+            logger.debug("- Multi-kill window expired.")
+            MULTI_KILL_EXPIRED = True
         MULTI_KILL_COUNT = 1
 
     KILL_COUNT += 1
     LAST_KILL_TIME = now
+    MULTI_KILL_EXPIRED = False
 
     if not multi_kill_occurred:
         if KILL_COUNT > 6:
@@ -87,13 +106,13 @@ def handle_kill():
             sound = next(filter(lambda x: x[2] == KILL_COUNT, KILL_SOUNDS))
             play_sound(sound[1], sound[0])
 
-    print(f"Total kills so far: {KILL_COUNT}")
+    logger.debug("- Total kills so far: %s\n", KILL_COUNT)
 
 
 def audio_callback(indata, status):
     """Audio callback function to handle the audio input."""
     if status:
-        print(status, flush=True)
+        logger.debug(status, flush=True)
 
     volume_norm = np.linalg.norm(indata) * 10
     threshold = 0.1
@@ -104,15 +123,26 @@ def audio_callback(indata, status):
 
 def main():
     """Start the audio stream and handle the logic."""
-    print("Started bug zapper kill streak tracker.")
+    logger.info("Started bug zapper kill streak tracker.")
     if TEST_MODE:
+        import threading
+
+        def check_expirations():
+            while True:
+                check_multi_kill_window()
+                reset_kills()
+                time.sleep(1)
+
+        expiration_thread = threading.Thread(target=check_expirations, daemon=True)
+        expiration_thread.start()
+
         while True:
-            input("Press Enter to simulate a zap.")
+            input("Press Enter to simulate a zap.\n")
             handle_kill()
-            reset_kills()  # Reset kills immediately after each simulation for testing
     else:
         with sd.InputStream(callback=audio_callback):
             while True:
+                check_multi_kill_window()
                 reset_kills()
                 time.sleep(1)
 
