@@ -60,8 +60,11 @@ def handle_kill():
     global KILL_COUNT, LAST_KILL_TIME, MULTI_KILL_COUNT
 
     now = datetime.now()
+    multi_kill_occurred = False
+
     if LAST_KILL_TIME and now - LAST_KILL_TIME <= MULTI_KILL_WINDOW:
         MULTI_KILL_COUNT += 1
+        multi_kill_occurred = True
         if MULTI_KILL_COUNT in [sound[2] for sound in MULTI_KILL_SOUNDS]:
             sound = next(filter(lambda x: x[2] == MULTI_KILL_COUNT, MULTI_KILL_SOUNDS))
             play_sound(sound[1])
@@ -71,9 +74,11 @@ def handle_kill():
     KILL_COUNT += 1
     LAST_KILL_TIME = now
 
-    if KILL_COUNT in [sound[2] for sound in KILL_SOUNDS]:
-        sound = next(filter(lambda x: x[2] == KILL_COUNT, KILL_SOUNDS))
-        play_sound(sound[1])
+    # Only play regular kill sound if no multi-kill sound was played
+    if not multi_kill_occurred:
+        if KILL_COUNT in [sound[2] for sound in KILL_SOUNDS]:
+            sound = next(filter(lambda x: x[2] == KILL_COUNT, KILL_SOUNDS))
+            play_sound(sound[1])
 
 
 def audio_callback(indata, status):
