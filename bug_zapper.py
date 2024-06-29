@@ -25,6 +25,7 @@ MULTI_KILL_SOUNDS = [
     ("Monster Kill", "sounds/monster_kill.wav", 5),
 ]
 
+TEST_MODE = True  # Set to True for testing mode (manual trigger)
 pygame.mixer.init()
 
 # Initialize the kill and timing variables
@@ -54,10 +55,29 @@ def reset_kills():
         START_TIME = now
 
 
-def audio_callback(indata, status):
-    """Audio callback function to handle the audio input."""
+def handle_kill():
+    """Handle a single kill event."""
     global KILL_COUNT, LAST_KILL_TIME, MULTI_KILL_COUNT
 
+    now = datetime.now()
+    if LAST_KILL_TIME and now - LAST_KILL_TIME <= MULTI_KILL_WINDOW:
+        MULTI_KILL_COUNT += 1
+        if MULTI_KILL_COUNT in [sound[2] for sound in MULTI_KILL_SOUNDS]:
+            sound = next(filter(lambda x: x[2] == MULTI_KILL_COUNT, MULTI_KILL_SOUNDS))
+            play_sound(sound[1])
+    else:
+        MULTI_KILL_COUNT = 1
+
+    KILL_COUNT += 1
+    LAST_KILL_TIME = now
+
+    if KILL_COUNT in [sound[2] for sound in KILL_SOUNDS]:
+        sound = next(filter(lambda x: x[2] == KILL_COUNT, KILL_SOUNDS))
+        play_sound(sound[1])
+
+
+def audio_callback(indata, status):
+    """Audio callback function to handle the audio input."""
     if status:
         print(status, flush=True)
 
@@ -65,31 +85,22 @@ def audio_callback(indata, status):
     threshold = 0.1
 
     if volume_norm > threshold:
-        now = datetime.now()
-        if LAST_KILL_TIME and now - LAST_KILL_TIME <= MULTI_KILL_WINDOW:
-            MULTI_KILL_COUNT += 1
-            if MULTI_KILL_COUNT in [sound[2] for sound in MULTI_KILL_SOUNDS]:
-                sound = next(filter(lambda x: x[2] == MULTI_KILL_COUNT, MULTI_KILL_SOUNDS))
-                play_sound(sound[1])
-        else:
-            MULTI_KILL_COUNT = 1
-            play_sound("first_blood.wav")
-
-        KILL_COUNT += 1
-        LAST_KILL_TIME = now
-
-        if KILL_COUNT in [sound[2] for sound in KILL_SOUNDS]:
-            sound = next(filter(lambda x: x[2] == KILL_COUNT, KILL_SOUNDS))
-            play_sound(sound[1])
+        handle_kill()
 
 
 def main():
     """Start the audio stream and handle the logic."""
-    with sd.InputStream(callback=audio_callback):
-        print("Started bug zapper kill streak tracker.")
+    print("Started bug zapper kill streak tracker.")
+    if TEST_MODE:
         while True:
-            reset_kills()
-            time.sleep(1)
+            input("Press Enter to simulate a zap.")
+            handle_kill()
+            reset_kills()  # Reset kills immediately after each simulation for testing
+    else:
+        with sd.InputStream(callback=audio_callback):
+            while True:
+                reset_kills()
+                time.sleep(1)
 
 
 if __name__ == "__main__":
