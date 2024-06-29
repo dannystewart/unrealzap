@@ -25,6 +25,9 @@ MULTI_KILL_SOUNDS = [
     ("Monster Kill", "sounds/monster_kill.wav", 5),
 ]
 
+# Headshot sound for kills past the number of sounds we have
+HEADSHOT_SOUND = "sounds/headshot.wav"
+
 TEST_MODE = True  # Set to True for testing mode (manual trigger)
 pygame.mixer.init()
 
@@ -74,11 +77,11 @@ def handle_kill():
     KILL_COUNT += 1
     LAST_KILL_TIME = now
 
-    # Only play regular kill sound if no multi-kill sound was played
-    if not multi_kill_occurred:
-        if KILL_COUNT in [sound[2] for sound in KILL_SOUNDS]:
-            sound = next(filter(lambda x: x[2] == KILL_COUNT, KILL_SOUNDS))
-            play_sound(sound[1])
+    if KILL_COUNT > 6:
+        play_sound(HEADSHOT_SOUND)
+    elif not multi_kill_occurred and KILL_COUNT in [sound[2] for sound in KILL_SOUNDS]:
+        sound = next(filter(lambda x: x[2] == KILL_COUNT, KILL_SOUNDS))
+        play_sound(sound[1])
 
 
 def audio_callback(indata, status):
