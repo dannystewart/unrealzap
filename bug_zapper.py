@@ -46,7 +46,8 @@ MULTI_KILL_SOUNDS = [
 
 HEADSHOT_SOUND = "sounds/headshot.wav"
 
-TEST_MODE = True  # Set to True for testing mode (manual trigger)
+# Set TEST_MODE to True for testing mode (manual trigger)
+TEST_MODE = False
 pygame.mixer.init()
 
 # Initialize the kill and timing variables
@@ -59,7 +60,8 @@ START_TIME = datetime.now()
 MULTI_KILL_EXPIRED = False
 
 # Audio threshold for detecting loud sounds (like a zap)
-AUDIO_THRESHOLD = 0.5
+TEST_THRESHOLD = 0.1
+TRIGGER_THRESHOLD = 0.2
 SAMPLE_RATE = 44100
 SAMPLE_DURATION = 0.1  # Duration of each audio sample in seconds
 
@@ -151,14 +153,17 @@ def handle_kill():
     logger.debug(colored(f"Total kills so far: {KILL_COUNT}", "yellow"))
 
 
-def audio_callback(indata, status):
+def audio_callback(indata, frames, time, status):  # noqa: ARG001
     """Audio callback function to handle the audio input."""
     if status:
+        logger.debug("Status: %s", status)
         logger.debug(status, flush=True)
 
     # Calculate RMS (root mean square) to detect loud bursts of sound
     volume = np.sqrt(np.mean(indata**2))
-    if volume > AUDIO_THRESHOLD:
+    if volume > TEST_THRESHOLD:
+        logger.debug("Volume: %f", volume)
+    if volume > TRIGGER_THRESHOLD:
         logger.debug(colored("Zap detected!", "red"))
         handle_kill()
 
@@ -188,21 +193,25 @@ def main():
                 print(colored("Exiting.", "green"))
                 sys.exit(0)
     else:
-        with sd.InputStream(
-            callback=audio_callback,
-            channels=1,
-            samplerate=SAMPLE_RATE,
-            blocksize=int(SAMPLE_RATE * SAMPLE_DURATION),
-            dtype="float32",
-        ):
-            while True:
-                try:
+        try:
+            device_info = sd.query_devices(kind="input")
+            logger.debug("Using device: %s", device_info)
+            with sd.InputStream(
+                callback=audio_callback,
+                channels=1,
+                samplerate=SAMPLE_RATE,
+                blocksize=int(SAMPLE_RATE * SAMPLE_DURATION),
+                dtype="float32",
+            ):
+                logger.info(colored("Audio stream started successfully.", "cyan"))
+                while True:
                     check_multi_kill_window()
                     reset_kills()
                     time.sleep(1)
-                except KeyboardInterrupt:
-                    print(colored("Exiting.", "green"))
-                    sys.exit(0)
+        except Exception as e:
+            logger.error(f"Failed to start audio stream: {e}")
+            logger.error("Make sure you have allowed microphone access to the terminal.")
+            sys.exit(1)
 
 
 if __name__ == "__main__":
