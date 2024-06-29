@@ -82,7 +82,7 @@ def get_key():
 
 def play_sound(file, label):
     """Play the sound file and log the event."""
-    logger.info(colored(f"Playing sound: {label}", "blue"))
+    logger.info("Playing sound: %s", label)
     pygame.mixer.music.load(file)
     pygame.mixer.music.play()
     while pygame.mixer.music.get_busy():
@@ -104,11 +104,11 @@ def multi_kill_expired():
     """Set the multi-kill window to expired."""
     global MULTI_KILL_COUNT, MULTI_KILL_EXPIRED
     multi_kills = MULTI_KILL_COUNT - 1
-    count_text = colored(
-        f"{multi_kills} kill{'s' if multi_kills != 1 else ''}", f"{'yellow' if multi_kills > 0 else 'cyan'}"
+    logger.debug(
+        "Multi-kill window expired after %s additional kill%s.\r",
+        multi_kills,
+        "s" if multi_kills != 1 else "",
     )
-    expired_text = colored(f"Multi-kill window expired after {count_text}.", "cyan")
-    logger.info("%s\r", expired_text)
     MULTI_KILL_EXPIRED = True
 
 
@@ -150,7 +150,7 @@ def handle_kill():
             sound = next(filter(lambda x: x[2] == KILL_COUNT, KILL_SOUNDS))
             play_sound(sound[1], sound[0])
 
-    logger.debug(colored(f"Total kills so far: {KILL_COUNT}", "yellow"))
+    logger.debug("Kills so far today (excluding multi-kills): %s", KILL_COUNT)
 
 
 def audio_callback(indata, frames, time, status):  # noqa: ARG001
@@ -164,13 +164,13 @@ def audio_callback(indata, frames, time, status):  # noqa: ARG001
     if volume > TEST_THRESHOLD:
         logger.debug("Volume: %f", volume)
     if volume > TRIGGER_THRESHOLD:
-        logger.debug(colored("Zap detected!", "red"))
+        logger.info(colored("Zap detected!", "red"))
         handle_kill()
 
 
 def main():
     """Start the audio stream and handle the logic."""
-    logger.info(colored("Started bug zapper kill streak tracker.", "green"))
+    logger.info("Started bug zapper kill streak tracker.")
 
     if TEST_MODE:
 
@@ -190,7 +190,7 @@ def main():
                 logger.debug(colored("Zap!", "cyan"))
                 handle_kill()
             except KeyboardInterrupt:
-                print(colored("Exiting.", "green"))
+                logger.info("Exiting.")
                 sys.exit(0)
     else:
         try:
@@ -203,11 +203,14 @@ def main():
                 blocksize=int(SAMPLE_RATE * SAMPLE_DURATION),
                 dtype="float32",
             ):
-                logger.info(colored("Audio stream started successfully.", "cyan"))
+                logger.info("Audio stream started successfully.")
                 while True:
                     check_multi_kill_window()
                     reset_kills()
                     time.sleep(1)
+        except KeyboardInterrupt:
+            logger.info("Exiting.")
+            sys.exit(0)
         except Exception as e:
             logger.error(f"Failed to start audio stream: {e}")
             logger.error("Make sure you have allowed microphone access to the terminal.")
