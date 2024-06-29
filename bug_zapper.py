@@ -64,7 +64,6 @@ MULTI_KILL_EXPIRED = False
 # Audio threshold for detecting loud sounds (like a zap)
 TEST_THRESHOLD = 0.05
 TRIGGER_THRESHOLD = 0.2
-SAMPLE_RATE = 44100
 SAMPLE_DURATION = 0.1  # Duration of each audio sample in seconds
 
 # Quiet hours (don't play sounds during this window)
@@ -214,7 +213,6 @@ def main():
 
         expiration_thread = threading.Thread(target=check_expirations, daemon=True)
         expiration_thread.start()
-
         while True:
             try:
                 logger.info(colored("Press any key to simulate a zap.", "green"))
@@ -228,15 +226,14 @@ def main():
         midnight_reset_thread = threading.Thread(target=reset_at_midnight, daemon=True)
         midnight_reset_thread.start()
         try:
-            logger.debug("Available audio devices: %s", sd.query_devices())
-            device_info = sd.query_devices(kind="input")
+            device_info = sd.query_devices(INPUT_DEVICE_INDEX, "input")
             logger.debug("Using device: %s", device_info)
             with sd.InputStream(
-                device=INPUT_DEVICE_INDEX,  # Specify the input device
+                device=INPUT_DEVICE_INDEX,
+                samplerate=device_info["default_samplerate"],
                 callback=audio_callback,
                 channels=1,
-                samplerate=SAMPLE_RATE,
-                blocksize=int(SAMPLE_RATE * SAMPLE_DURATION),
+                blocksize=int(device_info["default_samplerate"] * SAMPLE_DURATION),
                 dtype="float32",
             ):
                 logger.info("Audio stream started successfully.")
