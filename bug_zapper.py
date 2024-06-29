@@ -1,6 +1,8 @@
 """Bug zapper kill streak tracker."""
 
 import logging
+import os
+import sys
 import time
 from datetime import datetime, timedelta
 
@@ -8,6 +10,12 @@ import numpy as np
 import pygame
 import sounddevice as sd
 from termcolor import colored
+
+if os.name == "nt":
+    import msvcrt
+else:
+    import termios
+    import tty
 
 # Set up logger
 logger = logging.getLogger(__name__)
@@ -50,9 +58,23 @@ START_TIME = datetime.now()
 MULTI_KILL_EXPIRED = False
 
 
+def get_key():
+    """Read a single keypress from the user."""
+    if os.name == "nt":
+        return msvcrt.getch().decode("utf-8")
+    else:
+        fd = sys.stdin.fileno()
+        old_settings = termios.tcgetattr(fd)
+        try:
+            tty.setraw(fd)
+            return sys.stdin.read(1)
+        finally:
+            termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+
+
 def play_sound(file, label):
     """Play the sound file and log the event."""
-    logger.debug(colored(f"Playing sound: {label}", "blue"))
+    logger.info(colored(f"Playing sound: {label}", "blue"))
     pygame.mixer.music.load(file)
     pygame.mixer.music.play()
     while pygame.mixer.music.get_busy():
@@ -70,14 +92,20 @@ def reset_kills():
         START_TIME = now
 
 
+def multi_kill_expired():
+    """Set the multi-kill window to expired."""
+    global MULTI_KILL_EXPIRED
+    logger.debug(colored("Multi-kill window expired.", "cyan"))
+    MULTI_KILL_EXPIRED = True
+
+
 def check_multi_kill_window():
     """Check if the multi-kill window has expired."""
     global MULTI_KILL_EXPIRED, LAST_KILL_TIME
     now = datetime.now()
     if LAST_KILL_TIME and now - LAST_KILL_TIME > MULTI_KILL_WINDOW:
         if not MULTI_KILL_EXPIRED:
-            logger.debug("Multi-kill window expired.")
-            MULTI_KILL_EXPIRED = True
+            multi_kill_expired()
 
 
 def handle_kill():
@@ -95,8 +123,7 @@ def handle_kill():
             play_sound(sound[1], sound[0])
     else:
         if LAST_KILL_TIME and not MULTI_KILL_EXPIRED:
-            logger.debug("Multi-kill window expired.")
-            MULTI_KILL_EXPIRED = True
+            multi_kill_expired()
         MULTI_KILL_COUNT = 1
 
     KILL_COUNT += 1
@@ -141,8 +168,8 @@ def main():
         expiration_thread.start()
 
         while True:
-            logger.info(colored("Press Enter to simulate a zap.", "green"))
-            input()
+            logger.info(colored("Press any key to simulate a zap.", "green"))
+            get_key()
             logger.debug(colored("Zap!", "cyan"))
             handle_kill()
     else:
