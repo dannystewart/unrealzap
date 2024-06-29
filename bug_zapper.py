@@ -173,16 +173,24 @@ def main():
         expiration_thread.start()
 
         while True:
-            logger.info(colored("Press any key to simulate a zap.", "green"))
-            get_key()
-            logger.debug(colored("Zap!", "cyan"))
-            handle_kill()
+            try:
+                logger.info(colored("Press any key to simulate a zap.", "green"))
+                get_key()
+                logger.debug(colored("Zap!", "cyan"))
+                handle_kill()
+            except KeyboardInterrupt:
+                print(colored("Exiting.", "green"))
+                sys.exit(0)
     else:
         with sd.InputStream(callback=audio_callback):
             while True:
-                check_multi_kill_window()
-                reset_kills()
-                time.sleep(1)
+                try:
+                    check_multi_kill_window()
+                    reset_kills()
+                    time.sleep(1)
+                except KeyboardInterrupt:
+                    print(colored("Exiting.", "green"))
+                    sys.exit(0)
 
 
 if __name__ == "__main__":
