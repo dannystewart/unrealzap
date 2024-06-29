@@ -245,15 +245,7 @@ def main():
             hostapi_info = sd.query_hostapis()
             logger.debug("Using host API: %s", hostapi_info)
 
-            sample_rate = find_valid_sample_rate(device_info)
-            with sd.InputStream(
-                device=INPUT_DEVICE_INDEX,
-                samplerate=sample_rate,
-                callback=audio_callback,
-                channels=1,
-                blocksize=int(sample_rate * SAMPLE_DURATION),
-                dtype="float32",
-            ):
+            with sd.InputStream(device=INPUT_DEVICE_INDEX, callback=audio_callback):
                 logger.info("Audio stream started successfully.")
                 while True:
                     check_multi_kill_window()
