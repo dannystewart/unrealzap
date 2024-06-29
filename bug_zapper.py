@@ -25,7 +25,6 @@ MULTI_KILL_SOUNDS = [
     ("Monster Kill", "sounds/monster_kill.wav", 5),
 ]
 
-# Headshot sound for kills past the number of sounds we have
 HEADSHOT_SOUND = "sounds/headshot.wav"
 
 TEST_MODE = True  # Set to True for testing mode (manual trigger)
@@ -35,13 +34,14 @@ pygame.mixer.init()
 LAST_KILL_TIME = None
 KILL_COUNT = 0
 MULTI_KILL_COUNT = 0
-MULTI_KILL_WINDOW = timedelta(minutes=2)
-KILL_RESET_TIME = timedelta(hours=24)
+MULTI_KILL_WINDOW = timedelta(seconds=3) if TEST_MODE else timedelta(minutes=2)
+KILL_RESET_TIME = timedelta(minutes=1) if TEST_MODE else timedelta(hours=24)
 START_TIME = datetime.now()
 
 
-def play_sound(file):
-    """Play the sound file."""
+def play_sound(file, label):
+    """Play the sound file and log the event."""
+    print(f"Playing sound: {label}")
     pygame.mixer.music.load(file)
     pygame.mixer.music.play()
     while pygame.mixer.music.get_busy():
@@ -53,6 +53,7 @@ def reset_kills():
     global KILL_COUNT, LAST_KILL_TIME, START_TIME
     now = datetime.now()
     if now - START_TIME >= KILL_RESET_TIME:
+        print("Overall timer reset.")
         KILL_COUNT = 0
         LAST_KILL_TIME = None
         START_TIME = now
@@ -70,18 +71,23 @@ def handle_kill():
         multi_kill_occurred = True
         if MULTI_KILL_COUNT in [sound[2] for sound in MULTI_KILL_SOUNDS]:
             sound = next(filter(lambda x: x[2] == MULTI_KILL_COUNT, MULTI_KILL_SOUNDS))
-            play_sound(sound[1])
+            play_sound(sound[1], sound[0])
     else:
+        if LAST_KILL_TIME:
+            print("Multi-kill window expired.")
         MULTI_KILL_COUNT = 1
 
     KILL_COUNT += 1
     LAST_KILL_TIME = now
 
     if KILL_COUNT > 6:
-        play_sound(HEADSHOT_SOUND)
-    elif not multi_kill_occurred and KILL_COUNT in [sound[2] for sound in KILL_SOUNDS]:
-        sound = next(filter(lambda x: x[2] == KILL_COUNT, KILL_SOUNDS))
-        play_sound(sound[1])
+        play_sound(HEADSHOT_SOUND, "Headshot!")
+    elif not multi_kill_occurred:
+        if KILL_COUNT in [sound[2] for sound in KILL_SOUNDS]:
+            sound = next(filter(lambda x: x[2] == KILL_COUNT, KILL_SOUNDS))
+            play_sound(sound[1], sound[0])
+
+    print(f"Total kills so far: {KILL_COUNT}")
 
 
 def audio_callback(indata, status):
