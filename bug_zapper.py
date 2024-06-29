@@ -228,6 +228,7 @@ def main():
         midnight_reset_thread = threading.Thread(target=reset_at_midnight, daemon=True)
         midnight_reset_thread.start()
         try:
+            logger.debug("Available audio devices: %s", sd.query_devices())
             device_info = sd.query_devices(kind="input")
             logger.debug("Using device: %s", device_info)
             with sd.InputStream(
