@@ -19,15 +19,19 @@ else:
     import termios
     import tty
 
-# Set up logger
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
-handler = logging.StreamHandler(sys.stdout)
-formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
-handler.setFormatter(formatter)
-logger.addHandler(handler)
+# Set TEST_MODE to True for testing mode (manual trigger)
+TEST_MODE = False
 
-# Kill sounds and corresponding thresholds
+# Audio threshold for detecting loud sounds (like a zap)
+LOGGING_THRESHOLD = 0.05
+TRIGGER_THRESHOLD = 10.0
+
+# Quiet hours (don't play sounds during this window)
+QUIET_HOURS_START = 0  # 12 AM
+QUIET_HOURS_END = 8  # 8 AM
+
+# Sounds and corresponding thresholds
+HEADSHOT_SOUND = "sounds/headshot.wav"
 KILL_SOUNDS = [
     ("First Blood", "sounds/first_blood.wav", 1),
     ("Killing Spree", "sounds/killing_spree.wav", 2),
@@ -36,8 +40,6 @@ KILL_SOUNDS = [
     ("Unstoppable", "sounds/unstoppable.wav", 5),
     ("Godlike", "sounds/godlike.wav", 6),
 ]
-
-# Multi kill sounds and corresponding thresholds
 MULTI_KILL_SOUNDS = [
     ("Double Kill", "sounds/double_kill.wav", 2),
     ("Multi Kill", "sounds/multi_kill.wav", 3),
@@ -45,17 +47,10 @@ MULTI_KILL_SOUNDS = [
     ("Monster Kill", "sounds/monster_kill.wav", 5),
 ]
 
-HEADSHOT_SOUND = "sounds/headshot.wav"
-
-# Set input device index for the correct audio device
+# Set input device values
 INPUT_DEVICE_INDEX = 2
-
-# ALSA device name
 INPUT_DEVICE_NAME = "hw:3,0"
-
-# Set TEST_MODE to True for testing mode (manual trigger)
-TEST_MODE = False
-pygame.mixer.init()
+SAMPLE_DURATION = 0.1  # Duration of each audio sample in seconds
 
 # Initialize the kill and timing variables
 LAST_KILL_TIME = None
@@ -65,14 +60,16 @@ MULTI_KILL_WINDOW = timedelta(seconds=3) if TEST_MODE else timedelta(minutes=1)
 START_TIME = datetime.now()
 MULTI_KILL_EXPIRED = False
 
-# Audio threshold for detecting loud sounds (like a zap)
-TEST_THRESHOLD = 0.05
-TRIGGER_THRESHOLD = 0.2
-SAMPLE_DURATION = 0.1  # Duration of each audio sample in seconds
+# Set up logger
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
+handler = logging.StreamHandler(sys.stdout)
+formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
+handler.setFormatter(formatter)
+logger.addHandler(handler)
 
-# Quiet hours (don't play sounds during this window)
-QUIET_HOURS_START = 0  # 12 AM
-QUIET_HOURS_END = 8  # 8 AM
+# Initialize mixer
+pygame.mixer.init()
 
 
 def get_key():
@@ -198,7 +195,7 @@ def audio_callback(in_data, frames, time_info, status):  # noqa: ARG001
 
     # Calculate RMS (root mean square) to detect loud bursts of sound
     volume = np.sqrt(np.mean(audio_data**2))
-    if volume > TEST_THRESHOLD:
+    if volume > LOGGING_THRESHOLD:
         logger.debug(f"Volume: {volume}")
     if volume > TRIGGER_THRESHOLD:
         logger.info(colored("Zap detected!", "red"))
