@@ -1,0 +1,12 @@
+{
+	"folders": [
+		{
+			"path": "."
+		}
+	],
+	"settings": {
+		"ruff.format.args": [
+			"--config=pyproject.toml"
+		],
+	}
+}

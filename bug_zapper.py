@@ -7,6 +7,7 @@ import threading
 import time
 from datetime import datetime, timedelta
 
+import alsaaudio
 import numpy as np
 import pygame
 import sounddevice as sd
@@ -48,6 +49,9 @@ HEADSHOT_SOUND = "sounds/headshot.wav"
 
 # Set input device index for the correct audio device
 INPUT_DEVICE_INDEX = 2
+
+# ALSA device name
+INPUT_DEVICE_NAME = "hw:3,0"
 
 # Set TEST_MODE to True for testing mode (manual trigger)
 TEST_MODE = False
@@ -184,30 +188,58 @@ def handle_kill():
     logger.debug("Kills so far today (excluding multi-kills): %s", KILL_COUNT)
 
 
-def audio_callback(indata, frames, time, status):  # noqa: ARG001
+def audio_callback(in_data, frames, time_info, status):  # noqa: ARG001
     """Audio callback function to handle the audio input."""
     if status:
-        logger.debug("Status: %s", status)
-        logger.debug(status, flush=True)
+        logger.debug(f"Status: {status}")
+
+    # Convert the audio data to a numpy array
+    audio_data = np.frombuffer(in_data, dtype=np.int16)
 
     # Calculate RMS (root mean square) to detect loud bursts of sound
-    volume = np.sqrt(np.mean(indata**2))
+    volume = np.sqrt(np.mean(audio_data**2))
     if volume > TEST_THRESHOLD:
-        logger.debug("Volume: %f", volume)
+        logger.debug(f"Volume: {volume}")
     if volume > TRIGGER_THRESHOLD:
         logger.info(colored("Zap detected!", "red"))
         handle_kill()
 
 
-def find_valid_sample_rate(device_info, sample_rates=(44100, 48000)):
-    """Find the first valid sample rate that works with the device."""
-    for rate in sample_rates:
+def find_input_device():
+    """Find the input device that matches our criteria."""
+    devices = sd.query_devices()
+    for device in devices:
+        if device["max_input_channels"] > 0 and "Luna" in device["name"]:
+            return device["index"]
+    raise ValueError("No suitable input device found")
+
+
+def get_supported_sample_rates(device_index):
+    """Get the supported sample rates for the device."""
+    try:
+        device_info = sd.query_devices(device_index)
+        return [int(device_info["default_samplerate"])]
+    except Exception as e:
+        logger.error(f"Failed to get supported sample rates: {e}")
+        return []
+
+
+def find_valid_sample_rate(device_index):
+    """Find a valid sample rate for the device."""
+    supported_rates = get_supported_sample_rates(device_index)
+
+    if not supported_rates:
+        logger.warning("No supported sample rates found. Falling back to default rates.")
+        supported_rates = [44100, 48000, 96000, 192000]
+
+    for rate in supported_rates:
         try:
-            sd.check_input_settings(device=device_info["index"], samplerate=rate)
-            logger.debug("Valid sample rate found: %s", rate)
+            sd.check_input_settings(device=device_index, samplerate=rate)
+            logger.debug(f"Valid sample rate found: {rate}")
             return rate
         except Exception as e:
-            logger.warning("Sample rate %s not supported: %s", rate, str(e))
+            logger.warning(f"Sample rate {rate} not supported: {str(e)}")
+
     raise ValueError("No valid sample rates found.")
 
 
@@ -239,18 +271,29 @@ def main():
         midnight_reset_thread.start()
 
         try:
-            device_info = sd.query_devices(INPUT_DEVICE_INDEX, "input")
-            logger.debug("Using device: %s", device_info)
+            # Open the audio device
+            inp = alsaaudio.PCM(
+                alsaaudio.PCM_CAPTURE, alsaaudio.PCM_NONBLOCK, device=INPUT_DEVICE_NAME
+            )
 
-            hostapi_info = sd.query_hostapis()
-            logger.debug("Using host API: %s", hostapi_info)
+            # Set attributes
+            inp.setchannels(1)
+            inp.setrate(44100)
+            inp.setformat(alsaaudio.PCM_FORMAT_S16_LE)
+            inp.setperiodsize(1024)
 
-            with sd.InputStream(device=INPUT_DEVICE_INDEX, callback=audio_callback):
-                logger.info("Audio stream started successfully.")
-                while True:
-                    check_multi_kill_window()
-                    reset_kills()
-                    time.sleep(1)
+            logger.info("Audio stream started successfully.")
+
+            while True:
+                # Read data from device
+                lv, data = inp.read()
+                if lv:
+                    audio_callback(data, lv, None, None)
+
+                check_multi_kill_window()
+                reset_kills()
+                time.sleep(0.001)  # Small sleep to prevent CPU hogging
+
         except KeyboardInterrupt:
             logger.info("Exiting.")
             sys.exit(0)
