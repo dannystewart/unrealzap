@@ -23,8 +23,11 @@ else:
 TEST_MODE = False
 
 # Audio threshold for detecting loud sounds (like a zap)
-LOGGING_THRESHOLD = 0.05
-TRIGGER_THRESHOLD = 10.0
+LOGGING_THRESHOLD = 0.0
+TRIGGER_THRESHOLD = 1.0
+
+# Cooldown period (in seconds) to prevent retriggering
+COOLDOWN_PERIOD = 4
 
 # Quiet hours (don't play sounds during this window)
 QUIET_HOURS_START = 0  # 12 AM
@@ -59,6 +62,7 @@ MULTI_KILL_COUNT = 0
 MULTI_KILL_WINDOW = timedelta(seconds=3) if TEST_MODE else timedelta(minutes=1)
 START_TIME = datetime.now()
 MULTI_KILL_EXPIRED = False
+LAST_DETECTION_TIME = None
 
 # Set up logger
 logger = logging.getLogger(__name__)
@@ -149,13 +153,20 @@ def check_multi_kill_window():
 
 def handle_kill():
     """Handle a single kill event."""
-    global KILL_COUNT, LAST_KILL_TIME, MULTI_KILL_COUNT, MULTI_KILL_EXPIRED
+    global KILL_COUNT, LAST_KILL_TIME, MULTI_KILL_COUNT, MULTI_KILL_EXPIRED, LAST_DETECTION_TIME
 
     if during_quiet_hours():
         logger.info("Quiet hours in effect. Not counting kill.")
         return
 
     now = datetime.now()
+
+    # Check if we're still in the cooldown period
+    if LAST_DETECTION_TIME and (now - LAST_DETECTION_TIME).total_seconds() < COOLDOWN_PERIOD:
+        logger.debug("Detection ignored due to cooldown period.")
+        return
+
+    LAST_DETECTION_TIME = now
     multi_kill_occurred = False
 
     if LAST_KILL_TIME and now - LAST_KILL_TIME <= MULTI_KILL_WINDOW:
@@ -211,35 +222,6 @@ def find_input_device():
     raise ValueError("No suitable input device found")
 
 
-def get_supported_sample_rates(device_index):
-    """Get the supported sample rates for the device."""
-    try:
-        device_info = sd.query_devices(device_index)
-        return [int(device_info["default_samplerate"])]
-    except Exception as e:
-        logger.error(f"Failed to get supported sample rates: {e}")
-        return []
-
-
-def find_valid_sample_rate(device_index):
-    """Find a valid sample rate for the device."""
-    supported_rates = get_supported_sample_rates(device_index)
-
-    if not supported_rates:
-        logger.warning("No supported sample rates found. Falling back to default rates.")
-        supported_rates = [44100, 48000, 96000, 192000]
-
-    for rate in supported_rates:
-        try:
-            sd.check_input_settings(device=device_index, samplerate=rate)
-            logger.debug(f"Valid sample rate found: {rate}")
-            return rate
-        except Exception as e:
-            logger.warning(f"Sample rate {rate} not supported: {str(e)}")
-
-    raise ValueError("No valid sample rates found.")
-
-
 def main():
     """Start the audio stream and handle the logic."""
     logger.info("Started bug zapper kill streak tracker.")
@@ -275,7 +257,7 @@ def main():
 
             # Set attributes
             inp.setchannels(1)
-            inp.setrate(44100)
+            inp.setrate(16000)
             inp.setformat(alsaaudio.PCM_FORMAT_S16_LE)
             inp.setperiodsize(1024)
 
