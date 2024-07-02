@@ -6,6 +6,7 @@ import signal
 import sys
 import threading
 import time
+from collections import deque
 from datetime import datetime, timedelta
 
 import alsaaudio
@@ -74,6 +75,8 @@ START_TIME = datetime.now()
 MULTI_KILL_EXPIRED = False
 LAST_DETECTION_TIME = None
 
+zap_queue = deque(maxlen=100)  # Store last 100 zap times
+
 # Set up logger
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
@@ -140,6 +143,23 @@ def time_until_quiet_hours_end():
     return end_time - now
 
 
+def rate_limited_log(message, level=logging.INFO, limit=5):
+    """Log a message with rate limiting."""
+    current_time = time()
+    zap_queue.append(current_time)
+
+    if len(zap_queue) == 1 or current_time - zap_queue[0] > limit:
+        logger.log(level, message)
+        if len(zap_queue) > 1:
+            logger.log(
+                level,
+                "Suppressed %s similar log messages in the last %s seconds.",
+                len(zap_queue) - 1,
+                limit,
+            )
+        zap_queue.clear()
+
+
 def play_sound(file, label):
     """Play the sound file and log the event."""
     logger.info("Playing sound: %s", label)
@@ -180,47 +200,66 @@ def check_multi_kill_window():
         multi_kill_window_expired()
 
 
-def handle_kill():
-    """Handle a single kill event."""
-    global KILL_COUNT, LAST_KILL_TIME, MULTI_KILL_COUNT, MULTI_KILL_EXPIRED, LAST_DETECTION_TIME
-
-    if during_quiet_hours():
-        logger.info("Quiet hours in effect. Not counting kill.")
-        return
-
-    now = datetime.now()
-
-    # Check if we're still in the cooldown period
+def in_cooldown(now):
+    """Check if we're still in the cooldown period."""
+    global LAST_DETECTION_TIME
     if LAST_DETECTION_TIME and (now - LAST_DETECTION_TIME).total_seconds() < COOLDOWN_PERIOD:
-        logger.debug("Detection ignored due to cooldown period.")
-        return
-
+        return True
     LAST_DETECTION_TIME = now
-    multi_kill_occurred = False
+    return False
+
+
+def handle_regular_kill():
+    """Handle regular kill logic."""
+    global KILL_COUNT, MULTI_KILL_COUNT, MULTI_KILL_EXPIRED
+
+    if LAST_KILL_TIME and not MULTI_KILL_EXPIRED:
+        multi_kill_window_expired()
+    MULTI_KILL_COUNT = 1
+    KILL_COUNT += 1
+
+    if KILL_COUNT > 6:
+        play_sound(HEADSHOT_SOUND, "Headshot!")
+    elif KILL_COUNT in [sound[2] for sound in KILL_SOUNDS]:
+        sound = next(filter(lambda x: x[2] == KILL_COUNT, KILL_SOUNDS))
+        play_sound(sound[1], sound[0])
+
+
+def handle_multi_kill(now):
+    """Handle multi-kill logic."""
+    global MULTI_KILL_COUNT, MULTI_KILL_EXPIRED, LAST_KILL_TIME
 
     if LAST_KILL_TIME and now - LAST_KILL_TIME <= MULTI_KILL_WINDOW:
         MULTI_KILL_COUNT += 1
-        multi_kill_occurred = True
         if MULTI_KILL_COUNT > 5:
             play_sound(HEADSHOT_SOUND, "Headshot!")
         elif MULTI_KILL_COUNT in [sound[2] for sound in MULTI_KILL_SOUNDS]:
             sound = next(filter(lambda x: x[2] == MULTI_KILL_COUNT, MULTI_KILL_SOUNDS))
             play_sound(sound[1], sound[0])
-    else:
-        if LAST_KILL_TIME and not MULTI_KILL_EXPIRED:
-            multi_kill_window_expired()
-        MULTI_KILL_COUNT = 1
-        KILL_COUNT += 1
+        return True
+    return False
+
+
+def handle_kill():
+    """Handle a single kill event."""
+    global LAST_KILL_TIME, MULTI_KILL_EXPIRED
+
+    now = datetime.now()
+
+    if in_cooldown(now):
+        logger.debug("Detection ignored due to cooldown period.")
+        return
+
+    if during_quiet_hours():
+        rate_limited_log("Zap detected during quiet hours. Not counting kill.", logging.DEBUG)
+        return
+
+    multi_kill_occurred = handle_multi_kill(now)
+    if not multi_kill_occurred:
+        handle_regular_kill()
 
     LAST_KILL_TIME = now
     MULTI_KILL_EXPIRED = False
-
-    if not multi_kill_occurred:
-        if KILL_COUNT > 6:
-            play_sound(HEADSHOT_SOUND, "Headshot!")
-        elif KILL_COUNT in [sound[2] for sound in KILL_SOUNDS]:
-            sound = next(filter(lambda x: x[2] == KILL_COUNT, KILL_SOUNDS))
-            play_sound(sound[1], sound[0])
 
     logger.debug("Kills so far today (excluding multi-kills): %s", KILL_COUNT)
 
