@@ -124,6 +124,22 @@ def during_quiet_hours():
         return now.hour >= QUIET_HOURS_START or now.hour < QUIET_HOURS_END
 
 
+def time_until_quiet_hours_end():
+    """Calculate time until quiet hours end."""
+    now = datetime.now()
+    if QUIET_HOURS_START <= QUIET_HOURS_END:
+        end_time = now.replace(hour=QUIET_HOURS_END, minute=0, second=0, microsecond=0)
+    else:
+        end_time = (now + timedelta(days=1)).replace(
+            hour=QUIET_HOURS_END, minute=0, second=0, microsecond=0
+        )
+
+    if end_time <= now:
+        end_time += timedelta(days=1)
+
+    return end_time - now
+
+
 def play_sound(file, label):
     """Play the sound file and log the event."""
     logger.info("Playing sound: %s", label)
@@ -282,11 +298,40 @@ def handle_live_mode():
         time.sleep(0.001)  # Small sleep to prevent CPU hogging
 
 
+def format_hour(hour):
+    """Format hour in 12-hour time without leading zeros."""
+    if hour == 0:
+        return "12 AM"
+    elif hour < 12:
+        return f"{hour} AM"
+    elif hour == 12:
+        return "12 PM"
+    else:
+        return f"{hour - 12} PM"
+
+
 def main():
     """Start the audio stream and handle the logic."""
     signal.signal(signal.SIGTERM, signal_handler)
     logger.info("Started bug zapper kill streak tracker.")
     logger.debug("Volume thresholds: logging %s, trigger %s", LOGGING_THRESHOLD, TRIGGER_THRESHOLD)
+    logger.debug(
+        "Quiet hours: start %s, end %s",
+        format_hour(QUIET_HOURS_START),
+        format_hour(QUIET_HOURS_END),
+    )
+
+    if during_quiet_hours():
+        time_left = time_until_quiet_hours_end()
+        hours, remainder = divmod(time_left.seconds, 3600)
+        minutes, _ = divmod(remainder, 60)
+        logger.info(
+            "Currently in quiet hours. %d hours and %d minutes until quiet hours end.",
+            hours,
+            minutes,
+        )
+    else:
+        logger.info("Not currently in quiet hours.")
 
     if TEST_MODE:
         handle_test_mode()
