@@ -9,19 +9,24 @@ class TimeTracker:
     """Track time."""
 
     def __init__(self, kill_tracker):
-        self.logger = LocalLogger.setup_logger(self.__class__.__name__)
+        self.logger = LocalLogger.setup_logger(self.__class__.__name__, message_only=True)
 
         self.kill_tracker = kill_tracker
 
         # Cooldown period (in seconds) to prevent retriggering
-        self.cooldown_period = 4
+        self.cooldown_period = 30
 
         # Quiet hours (don't play sounds during this window)
         self.quiet_hours_start = 0  # 12 AM
         self.quiet_hours_end = 8  # 8 AM
 
+        # Multi kill window
+        self.multi_kill_window_test = timedelta(seconds=3)
+        self.multi_kill_window_live = timedelta(minutes=2)
         self.multi_kill_window = (
-            timedelta(seconds=3) if self.kill_tracker.test_mode else timedelta(minutes=1)
+            self.multi_kill_window_test
+            if self.kill_tracker.test_mode
+            else self.multi_kill_window_live
         )
         self.start_time = datetime.now()
         self.last_detection_time = None

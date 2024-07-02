@@ -13,7 +13,7 @@ TEST_MODE = False
 RUNNING = True
 
 # Set up logger
-logger = LocalLogger.setup_logger("main")
+logger = LocalLogger.setup_logger("main", message_only=True)
 
 
 def signal_handler(sig, frame):  # noqa: ARG001

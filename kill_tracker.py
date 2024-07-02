@@ -19,7 +19,7 @@ class KillTracker:
 
     def __init__(self, test_mode):
         self.test_mode = test_mode
-        self.logger = LocalLogger.setup_logger(self.__class__.__name__)
+        self.logger = LocalLogger.setup_logger(self.__class__.__name__, message_only=True)
         self.db_helper = DatabaseHelper()
         self.time = TimeTracker(self)
         self.audio = AudioHelper(self)

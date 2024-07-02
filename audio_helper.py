@@ -13,12 +13,12 @@ class AudioHelper:
     """Helper class for audio handling."""
 
     def __init__(self, bug_zapper):
-        self.logger = LocalLogger.setup_logger(self.__class__.__name__)
+        self.logger = LocalLogger.setup_logger(self.__class__.__name__, message_only=True)
         self.bug_zapper = bug_zapper
 
         # Audio threshold for detecting loud sounds (like a zap)
         self.logging_threshold = 0.0
-        self.trigger_threshold = 100.0
+        self.trigger_threshold = 120.0
 
         # Sounds and corresponding thresholds
         self.headshot_sound = "sounds/headshot.wav"
