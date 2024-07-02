@@ -2,6 +2,7 @@
 
 import logging
 import os
+import signal
 import sys
 import threading
 import time
@@ -19,12 +20,23 @@ else:
     import termios
     import tty
 
+
+def signal_handler(sig, frame):  # noqa: ARG001
+    """Signal handler to shut down the program."""
+    print("Received shutdown signal. Exiting gracefully...")
+    # Add any cleanup code here if necessary
+    sys.exit(0)
+
+
+# Set up signal handler to close the program
+signal.signal(signal.SIGTERM, signal_handler)
+
 # Set TEST_MODE to True for testing mode (manual trigger)
 TEST_MODE = False
 
 # Audio threshold for detecting loud sounds (like a zap)
-LOGGING_THRESHOLD = 0.0
-TRIGGER_THRESHOLD = 1.0
+LOGGING_THRESHOLD = 30.0
+TRIGGER_THRESHOLD = 70.0
 
 # Cooldown period (in seconds) to prevent retriggering
 COOLDOWN_PERIOD = 4
@@ -50,10 +62,8 @@ MULTI_KILL_SOUNDS = [
     ("Monster Kill", "sounds/monster_kill.wav", 5),
 ]
 
-# Set input device values
-INPUT_DEVICE_INDEX = 2
-INPUT_DEVICE_NAME = "hw:3,0"
-SAMPLE_DURATION = 0.1  # Duration of each audio sample in seconds
+# Set input device name
+INPUT_DEVICE_NAME = "hw:0,0"
 
 # Initialize the kill and timing variables
 LAST_KILL_TIME = None
@@ -74,6 +84,9 @@ logger.addHandler(handler)
 
 # Initialize mixer
 pygame.mixer.init()
+
+# Track whether to keep running
+running = True
 
 
 def get_key():
@@ -222,64 +235,74 @@ def find_input_device():
     raise ValueError("No suitable input device found")
 
 
+def handle_test_mode():
+    """Run the program in test mode."""
+
+    def check_expirations():
+        while True:
+            check_multi_kill_window()
+            reset_kills()
+            time.sleep(1)
+
+    expiration_thread = threading.Thread(target=check_expirations, daemon=True)
+    expiration_thread.start()
+    while True:
+        try:
+            logger.info(colored("Press any key to simulate a zap.", "green"))
+            get_key()
+            logger.debug(colored("Zap!", "cyan"))
+            handle_kill()
+        except KeyboardInterrupt:
+            logger.info("Exiting.")
+            sys.exit(0)
+
+
+def handle_live_mode():
+    """Run the program in live mode."""
+    # Open the audio device
+    inp = alsaaudio.PCM(alsaaudio.PCM_CAPTURE, alsaaudio.PCM_NONBLOCK, device=INPUT_DEVICE_NAME)
+
+    # Set attributes
+    inp.setchannels(1)
+    inp.setrate(16000)
+    inp.setformat(alsaaudio.PCM_FORMAT_S16_LE)
+    inp.setperiodsize(1024)
+
+    logger.info("Audio stream started successfully.")
+
+    while True:  # Read data from device
+        lv, data = inp.read()
+        if lv:
+            audio_callback(data, lv, None, None)
+
+        check_multi_kill_window()
+        reset_kills()
+        time.sleep(0.001)  # Small sleep to prevent CPU hogging
+
+
 def main():
     """Start the audio stream and handle the logic."""
+    signal.signal(signal.SIGTERM, signal_handler)
     logger.info("Started bug zapper kill streak tracker.")
+    logger.debug("Volume thresholds: logging %s, trigger %s", LOGGING_THRESHOLD, TRIGGER_THRESHOLD)
 
     if TEST_MODE:
-
-        def check_expirations():
-            while True:
-                check_multi_kill_window()
-                reset_kills()
-                time.sleep(1)
-
-        expiration_thread = threading.Thread(target=check_expirations, daemon=True)
-        expiration_thread.start()
-        while True:
-            try:
-                logger.info(colored("Press any key to simulate a zap.", "green"))
-                get_key()
-                logger.debug(colored("Zap!", "cyan"))
-                handle_kill()
-            except KeyboardInterrupt:
-                logger.info("Exiting.")
-                sys.exit(0)
+        handle_test_mode()
     else:
         midnight_reset_thread = threading.Thread(target=reset_at_midnight, daemon=True)
         midnight_reset_thread.start()
 
-        try:
-            # Open the audio device
-            inp = alsaaudio.PCM(
-                alsaaudio.PCM_CAPTURE, alsaaudio.PCM_NONBLOCK, device=INPUT_DEVICE_NAME
-            )
+        while running:
+            try:
+                handle_live_mode()
 
-            # Set attributes
-            inp.setchannels(1)
-            inp.setrate(16000)
-            inp.setformat(alsaaudio.PCM_FORMAT_S16_LE)
-            inp.setperiodsize(1024)
-
-            logger.info("Audio stream started successfully.")
-
-            while True:
-                # Read data from device
-                lv, data = inp.read()
-                if lv:
-                    audio_callback(data, lv, None, None)
-
-                check_multi_kill_window()
-                reset_kills()
-                time.sleep(0.001)  # Small sleep to prevent CPU hogging
-
-        except KeyboardInterrupt:
-            logger.info("Exiting.")
-            sys.exit(0)
-        except Exception as e:
-            logger.error(f"Failed to start audio stream: {e}")
-            logger.error("Make sure you have allowed microphone access to the terminal.")
-            sys.exit(1)
+            except KeyboardInterrupt:
+                logger.info("Exiting.")
+                sys.exit(0)
+            except Exception as e:
+                logger.error(f"Failed to start audio stream: {e}")
+                logger.error("Make sure you have allowed microphone access to the terminal.")
+                sys.exit(1)
 
 
 if __name__ == "__main__":
