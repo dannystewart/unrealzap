@@ -1,0 +1,3 @@
+[submodule "dsutil"]
+	path = dsutil
+	url = https://gitlab.dannystewart.com/danny/dsutil.git
