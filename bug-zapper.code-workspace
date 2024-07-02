@@ -8,5 +8,29 @@
 		"ruff.format.args": [
 			"--config=pyproject.toml"
 		],
+		"[python]": {
+			"editor.defaultFormatter": "charliermarsh.ruff"
+		},
+		"mypy-type-checker.args": [
+			"--config-file=app/pyproject.toml",
+			"--ignore-missing-imports",
+			"--warn-redundant-casts",
+			"--warn-return-any",
+			"--warn-unreachable",
+			"--warn-unused-configs",
+			"--warn-unused-ignores",
+			"--disallow_untyped_defs",
+			"false",
+			"--check_untyped_defs",
+			"true",
+		],
+		"python.analysis.extraPaths": [
+			".",
+			"/home/danny/bug-zapper"
+		],
+		"python.analysis.include": [
+			".",
+			"/home/danny/bug_zapper"
+		],
 	}
 }
