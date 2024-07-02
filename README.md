@@ -30,13 +30,13 @@ In addition to "Headshot," the following sounds are included:
 
 ## Setting Up a Raspberry Pi
 
-This is simple to set up with a Raspberry Pi and a cheap-ish USB conference mic that works with Linux like [this one](https://www.amazon.com/Bluetooth-Speakerphone-Microphone-Reduction-Algorithm/dp/B08DNTXYCT).
+This is simple to set up with a Raspberry Pi and a USB conference mic that works with Linux like [this one](https://www.amazon.com/dp/B0899S421T).
 
 Make sure the Raspberry Pi is up-to-date:
 
 ```bash
-sudo apt-get update
-sudo apt-get upgrade
+sudo apt update
+sudo apt upgrade
 ```
 
 Install Poetry:
@@ -54,7 +54,8 @@ export PATH="$HOME/.local/bin:$PATH"
 Clone the project and set up the virtual environment:
 
 ```bash
-cd /path/to/your/project
+cd /path/to/project
+poetry env use 3.12  # or whatever your Python version is
 poetry install --no-root
 ```
 Create a `systemd` service to run the script on startup:
@@ -68,16 +69,20 @@ Configure like so:
 ```
 [Unit]
 Description=Bug Zapper Kill Streak Tracker
-After=network.target
+After=network.target sound.target
 
 [Service]
-ExecStart=/home/pi/.local/bin/poetry run python /path/to/your/project/bug_zapper.py
-WorkingDirectory=/path/to/your/project
-StandardOutput=inherit
-StandardError=inherit
+ExecStart=/home/danny/.cache/pypoetry/virtualenvs/bug-zapper-EZ41eyuC-py3.12/bin/python /path/to/project/bug_zapper.py
+WorkingDirectory=/home/danny/bug-zapper
+StandardOutput=journal
+StandardError=journal
 Restart=always
-User=pi
+User=danny
+Group=audio
+Environment=PATH=/home/danny/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 Environment=PYTHONUNBUFFERED=1
+Environment=XDG_RUNTIME_DIR=/run/user/1000
+TimeoutStopSec=10
 
 [Install]
 WantedBy=multi-user.target
