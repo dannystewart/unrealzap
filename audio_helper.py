@@ -17,8 +17,8 @@ class AudioHelper:
         self.bug_zapper = bug_zapper
 
         # Audio threshold for detecting loud sounds (like a zap)
-        self.logging_threshold = 20.0
-        self.trigger_threshold = 130.0
+        self.logging_threshold = 0.0
+        self.trigger_threshold = 100.0
 
         # Sounds and corresponding thresholds
         self.headshot_sound = "sounds/headshot.wav"
@@ -135,8 +135,17 @@ class AudioHelper:
         # Convert the audio data to a numpy array
         audio_data = np.frombuffer(in_data, dtype=np.int16)
 
+        # Check if audio_data is empty
+        if audio_data.size == 0:
+            self.logger.warning("Received empty audio data")
+            return
+
         # Calculate RMS (root mean square) to detect loud bursts of sound
-        volume = np.sqrt(np.mean(audio_data**2))
+        # Use np.abs() to ensure we're not taking the square root of a negative number
+        # Use np.maximum to avoid division by zero
+        mean_square = np.mean(np.abs(audio_data) ** 2)
+        volume = np.sqrt(np.maximum(mean_square, 1e-10))  # Avoid sqrt of values very close to zero
+
         if volume > self.logging_threshold:
             self.logger.debug("Volume: %s", volume)
         if volume > self.trigger_threshold:

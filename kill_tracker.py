@@ -226,7 +226,12 @@ class KillTracker:
             try:
                 lv, data = inp.read()
                 if lv:
-                    self.audio.audio_callback(data, lv, None, None)
+                    if lv > 0:
+                        self.audio.audio_callback(data, lv, None, None)
+                    else:
+                        self.logger.warning(f"Received non-positive audio data length: {lv}")
+                else:
+                    self.logger.debug("No audio data read")
 
                 self.time.check_multi_kill_window()
                 self.time.reset_kills()
