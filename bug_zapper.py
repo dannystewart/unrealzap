@@ -259,14 +259,16 @@ def handle_test_mode():
 
 def handle_live_mode():
     """Run the program in live mode."""
-    # Open the audio device
-    inp = alsaaudio.PCM(alsaaudio.PCM_CAPTURE, alsaaudio.PCM_NONBLOCK, device=INPUT_DEVICE_NAME)
-
-    # Set attributes
-    inp.setchannels(1)
-    inp.setrate(16000)
-    inp.setformat(alsaaudio.PCM_FORMAT_S16_LE)
-    inp.setperiodsize(1024)
+    # Open the audio device with all parameters set at initialization
+    inp = alsaaudio.PCM(
+        alsaaudio.PCM_CAPTURE,
+        alsaaudio.PCM_NONBLOCK,
+        device=INPUT_DEVICE_NAME,
+        channels=1,
+        rate=16000,
+        format=alsaaudio.PCM_FORMAT_S16_LE,
+        periodsize=1024,
+    )
 
     logger.info("Audio stream started successfully.")
 
