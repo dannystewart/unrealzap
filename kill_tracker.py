@@ -220,14 +220,18 @@ class KillTracker:
         """Run the program in live mode."""
         # Open the audio device with all parameters set at initialization
         inp = self.audio.init_audio_device()
-
         self.logger.info("Audio stream started successfully.")
 
-        while True:  # Read data from device
-            lv, data = inp.read()
-            if lv:
-                self.audio.audio_callback(data, lv, None, None)
+        while True:
+            try:
+                lv, data = inp.read()
+                if lv:
+                    self.audio.audio_callback(data, lv, None, None)
 
-            self.time.check_multi_kill_window()
-            self.time.reset_kills()
-            time.sleep(0.001)  # Small sleep to prevent CPU hogging
+                self.time.check_multi_kill_window()
+                self.time.reset_kills()
+                time.sleep(0.001)  # Small sleep to prevent CPU hogging
+            except Exception as e:
+                self.logger.error("Error in audio processing: %s", str(e))
+                time.sleep(1)  # Wait a bit before trying again
+                inp = self.audio.init_audio_device()  # Reinitialize audio device

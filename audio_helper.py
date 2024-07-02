@@ -18,7 +18,7 @@ class AudioHelper:
 
         # Audio threshold for detecting loud sounds (like a zap)
         self.logging_threshold = 20.0
-        self.trigger_threshold = 100.0
+        self.trigger_threshold = 130.0
 
         # Sounds and corresponding thresholds
         self.headshot_sound = "sounds/headshot.wav"
@@ -99,18 +99,38 @@ class AudioHelper:
             periodsize=1024,
         )
 
+    def reinit_mixer(self):
+        """Reinitialize the Pygame mixer."""
+        try:
+            pygame.mixer.quit()
+            pygame.mixer.init()
+            self.logger.info("Pygame mixer reinitialized successfully.")
+            return True
+        except pygame.error as e:
+            self.logger.error("Failed to reinitialize Pygame mixer: %s", str(e))
+            return False
+
     def play_sound(self, file, label):
         """Play the sound file and log the event."""
         self.logger.info("Playing sound: %s", label)
-        pygame.mixer.music.load(file)
-        pygame.mixer.music.play()
-        while pygame.mixer.music.get_busy(self):
-            continue
+        try:
+            pygame.mixer.music.load(file)
+            pygame.mixer.music.play()
+            while pygame.mixer.music.get_busy():
+                pygame.time.Clock().tick(10)
+        except pygame.error as e:
+            self.logger.error("Failed to play sound: %s", str(e))
+            if "mixer not initialized" in str(e):
+                if self.reinit_mixer():
+                    self.logger.info("Retrying to play sound after mixer reinitialization.")
+                    self.play_sound(file, label)
+                else:
+                    self.logger.error("Unable to reinitialize mixer. Sound playback failed.")
 
     def audio_callback(self, in_data, frames, time_info, status):  # noqa: ARG001,ARG002
         """Audio callback function to handle the audio input."""
         if status:
-            self.logger.debug(f"Status: {status}")
+            self.logger.debug("Status: %s", status)
 
         # Convert the audio data to a numpy array
         audio_data = np.frombuffer(in_data, dtype=np.int16)
@@ -118,7 +138,7 @@ class AudioHelper:
         # Calculate RMS (root mean square) to detect loud bursts of sound
         volume = np.sqrt(np.mean(audio_data**2))
         if volume > self.logging_threshold:
-            self.logger.debug(f"Volume: {volume}")
+            self.logger.debug("Volume: %s", volume)
         if volume > self.trigger_threshold:
             self.logger.info(colored("Zap detected!", "red"))
             self.bug_zapper.handle_kill()
