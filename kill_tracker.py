@@ -163,9 +163,7 @@ class KillTracker:
             and now - self.time.last_kill_time <= self.time.multi_kill_window
         ):
             self.multi_kill_count += 1
-            if self.multi_kill_count > 5:
-                self.audio.play_sound(self.audio.headshot_sound, "Headshot!")
-            elif self.multi_kill_count in [sound[2] for sound in self.audio.multi_kill_sounds]:
+            if self.multi_kill_count in [sound[2] for sound in self.audio.multi_kill_sounds]:
                 sound = next(
                     filter(lambda x: x[2] == self.multi_kill_count, self.audio.multi_kill_sounds)
                 )
