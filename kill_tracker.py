@@ -8,6 +8,7 @@ from datetime import datetime
 from termcolor import colored
 
 from audio_helper import AudioHelper
+from config import ConfigManager
 from db_helper import DatabaseHelper
 from dsutil.log import LocalLogger
 from dsutil.shell import get_single_char_input
@@ -20,19 +21,12 @@ class KillTracker:
     def __init__(self, test_mode):
         self.test_mode = test_mode
         self.logger = LocalLogger.setup_logger(self.__class__.__name__, message_only=True)
+        self.config = ConfigManager()
         self.db_helper = DatabaseHelper()
         self.time = TimeTracker(self)
         self.audio = AudioHelper(self)
         self.kill_count = 0
         self.zap_queue = deque(maxlen=100)  # Store last 100 zap times
-
-        self.config_check_interval = 60  # Check every 60 seconds
-
-    def check_config_updates(self):
-        """Periodically check for configuration updates."""
-        while True:
-            self.audio.update_config()
-            time.sleep(self.config_check_interval)
 
     def handle_kill(self):
         """Handle a single kill event."""
@@ -118,7 +112,7 @@ class KillTracker:
                     if lv > 0:
                         self.audio.audio_callback(data, lv, None, None)
                     else:
-                        self.logger.warning(f"Received non-positive audio data length: {lv}")
+                        self.logger.warning("Received non-positive audio data length: %s", lv)
                 else:
                     self.logger.debug("No audio data read")
 

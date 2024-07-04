@@ -1,6 +1,3 @@
-import json
-import os
-
 import alsaaudio
 import numpy as np
 import pygame
@@ -15,10 +12,6 @@ class AudioHelper:
     def __init__(self, bug_zapper):
         self.logger = LocalLogger.setup_logger(self.__class__.__name__, message_only=True)
         self.bug_zapper = bug_zapper
-
-        # Audio threshold for detecting loud sounds (like a zap)
-        self.logging_threshold = 0.0
-        self.trigger_threshold = 120.0
 
         # Sounds and corresponding thresholds
         self.headshot_sound = "sounds/headshot.wav"
@@ -40,52 +33,11 @@ class AudioHelper:
         # Set input device name
         self.input_device_name = "hw:0,0"
 
-        # Config file
-        self.config_file = "config.json"
-        self.load_config(startup=True)
-
-        # Log at startup
-        self.logger.debug(
-            "Volume thresholds: logging %s, trigger %s",
-            self.logging_threshold,
-            self.trigger_threshold,
-        )
-
+        # Track number of errors
         self.error_count = 0
         self.error_threshold = 10
 
-    def load_config(self, startup=False):
-        """Load configuration from file."""
-        if os.path.exists(self.config_file):
-            with open(self.config_file) as f:
-                config = json.load(f)
-            self.logging_threshold = config.get("logging_threshold", 30.0)
-            self.trigger_threshold = config.get("trigger_threshold", 70.0)
-        else:
-            self.logging_threshold = 30.0
-            self.trigger_threshold = 70.0
-        if startup:
-            self.logger.info(
-                "Loaded volume thresholds from config: logging %s, trigger %s",
-                self.logging_threshold,
-                self.trigger_threshold,
-            )
-            if self.logging_threshold == -1:
-                self.logger.info("Volume logging is disabled.")
-            if self.trigger_threshold == -1:
-                self.logger.info("Zap triggering is disabled.")
-
-    def update_config(self):
-        """Update configuration from file."""
-        old_logging = self.logging_threshold
-        old_trigger = self.trigger_threshold
-        self.load_config()
-        if old_logging != self.logging_threshold or old_trigger != self.trigger_threshold:
-            self.logger.info(
-                "Updated volume thresholds from config: logging %s, trigger %s",
-                self.logging_threshold,
-                self.trigger_threshold,
-            )
+        self.init_mixer()
 
     def init_audio_device(self):
         """Open the audio device with all parameters set at initialization."""
@@ -99,15 +51,15 @@ class AudioHelper:
             periodsize=1024,
         )
 
-    def reinit_mixer(self):
-        """Reinitialize the Pygame mixer."""
+    def init_mixer(self):
+        """Initialize the Pygame mixer."""
         try:
             pygame.mixer.quit()
             pygame.mixer.init()
-            self.logger.info("Pygame mixer reinitialized successfully.")
+            self.logger.info("Pygame mixer initialized successfully.")
             return True
         except pygame.error as e:
-            self.logger.error("Failed to reinitialize Pygame mixer: %s", str(e))
+            self.logger.error("Failed to initialize Pygame mixer: %s", str(e))
             return False
 
     def play_sound(self, file, label):
@@ -159,9 +111,9 @@ class AudioHelper:
         mean_square = np.mean(np.abs(audio_data) ** 2)
         volume = np.sqrt(np.maximum(mean_square, 1e-10))  # Avoid sqrt of values very close to zero
 
-        if volume > self.logging_threshold:
+        if volume > self.bug_zapper.config.logging_threshold:
             self.logger.debug("Volume: %s", volume)
-        if volume > self.trigger_threshold:
+        if volume > self.bug_zapper.config.trigger_threshold:
             self.logger.info(colored("Zap detected!", "red"))
             self.bug_zapper.handle_kill()
 
