@@ -1,0 +1,19 @@
+[Unit]
+Description=Bug Zapper Kill Streak Tracker
+After=network.target sound.target
+
+[Service]
+ExecStart=/home/danny/.cache/pypoetry/virtualenvs/bug-zapper-EZ41eyuC-py3.12/bin/python /home/danny/bug-zapper/bug_zapper.py
+WorkingDirectory=/home/danny/bug-zapper
+StandardOutput=journal
+StandardError=journal
+Restart=always
+User=danny
+Group=audio
+Environment=PATH=/home/danny/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+Environment=PYTHONUNBUFFERED=1
+Environment=XDG_RUNTIME_DIR=/run/user/1000
+TimeoutStopSec=10
+
+[Install]
+WantedBy=multi-user.target
