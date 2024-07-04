@@ -132,6 +132,19 @@ class AudioHelper:
         if status:
             self.logger.debug("Status: %s", status)
 
+        self.logger.debug(
+            "Received audio data length: %s. Expected frames: %s", len(in_data), frames
+        )
+
+        if len(in_data) <= 0:
+            self.logger.warning("Received non-positive audio data length: %s", len(in_data))
+            if self.error_count >= self.error_threshold:
+                self.logger.info("Error threshold reached. Resetting internal state.")
+                self.reset_internal_state()
+            return
+
+        self.error_count = 0  # Reset error count on successful data receipt
+
         # Convert the audio data to a numpy array
         audio_data = np.frombuffer(in_data, dtype=np.int16)
 
@@ -151,3 +164,8 @@ class AudioHelper:
         if volume > self.trigger_threshold:
             self.logger.info(colored("Zap detected!", "red"))
             self.bug_zapper.handle_kill()
+
+    def reset_internal_state(self):
+        """Reset the error count and any other internal state variables."""
+        self.error_count = 0
+        self.logger.info("Internal state reset complete.")
