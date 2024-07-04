@@ -1,3 +1,6 @@
+import json
+import os
+
 import alsaaudio
 import numpy as np
 import pygame
@@ -37,12 +40,52 @@ class AudioHelper:
         # Set input device name
         self.input_device_name = "hw:0,0"
 
+        # Config file
+        self.config_file = "config.json"
+        self.load_config(startup=True)
+
         # Log at startup
         self.logger.debug(
             "Volume thresholds: logging %s, trigger %s",
             self.logging_threshold,
             self.trigger_threshold,
         )
+
+        self.error_count = 0
+        self.error_threshold = 10
+
+    def load_config(self, startup=False):
+        """Load configuration from file."""
+        if os.path.exists(self.config_file):
+            with open(self.config_file) as f:
+                config = json.load(f)
+            self.logging_threshold = config.get("logging_threshold", 30.0)
+            self.trigger_threshold = config.get("trigger_threshold", 70.0)
+        else:
+            self.logging_threshold = 30.0
+            self.trigger_threshold = 70.0
+        if startup:
+            self.logger.info(
+                "Loaded volume thresholds from config: logging %s, trigger %s",
+                self.logging_threshold,
+                self.trigger_threshold,
+            )
+            if self.logging_threshold == -1:
+                self.logger.info("Volume logging is disabled.")
+            if self.trigger_threshold == -1:
+                self.logger.info("Zap triggering is disabled.")
+
+    def update_config(self):
+        """Update configuration from file."""
+        old_logging = self.logging_threshold
+        old_trigger = self.trigger_threshold
+        self.load_config()
+        if old_logging != self.logging_threshold or old_trigger != self.trigger_threshold:
+            self.logger.info(
+                "Updated volume thresholds from config: logging %s, trigger %s",
+                self.logging_threshold,
+                self.trigger_threshold,
+            )
 
     def init_audio_device(self):
         """Open the audio device with all parameters set at initialization."""
