@@ -1,4 +1,4 @@
 {
-    "logging_threshold": 40.0,
-    "trigger_threshold": 80.0
+    "logging_threshold": 20.0,
+    "trigger_threshold": 100.0
 }
