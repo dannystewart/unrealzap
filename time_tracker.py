@@ -27,9 +27,7 @@ class TimeTracker:
         self.multi_kill_window_test = timedelta(seconds=3)
         self.multi_kill_window_live = timedelta(minutes=2)
         self.multi_kill_window = (
-            self.multi_kill_window_test
-            if self.kill_tracker.test_mode
-            else self.multi_kill_window_live
+            self.multi_kill_window_test if self.kill_tracker.test_mode else self.multi_kill_window_live
         )
         self.start_time = datetime.now()
         self.last_detection_time = None
@@ -46,10 +44,7 @@ class TimeTracker:
     def format_quiet_hours(self):
         """Format quiet hours for logging."""
         return ", ".join(
-            [
-                f"{self.format_time(start)} to {self.format_time(end)}"
-                for start, end in self.quiet_hours
-            ]
+            [f"{self.format_time(start)} to {self.format_time(end)}" for start, end in self.quiet_hours]
         )
 
     def format_time(self, time_tuple):
@@ -82,12 +77,13 @@ class TimeTracker:
         for start, end in self.quiet_hours:
             start_time = datetime_time(start[0], start[1])
             end_time = datetime_time(end[0], end[1])
-            if start_time <= end_time:
-                if start_time <= now < end_time:
-                    return True
-            else:  # Overlapping midnight case
-                if now >= start_time or now < end_time:
-                    return True
+            if (
+                start_time <= end_time
+                and start_time <= now < end_time
+                or start_time > end_time
+                and (now >= start_time or now < end_time)
+            ):
+                return True
         return False
 
     def time_until_quiet_hours_end(self):
@@ -100,30 +96,30 @@ class TimeTracker:
             start_time = datetime.time(start[0], start[1])
             end_time = datetime.time(end[0], end[1])
 
-            if start_time <= end_time:
-                if start_time <= current_time < end_time:
-                    return datetime.combine(now.date(), end_time) - now
-            else:  # Overlapping midnight case
-                if current_time >= start_time or current_time < end_time:
-                    if current_time >= start_time:
-                        return datetime.combine(now.date() + timedelta(days=1), end_time) - now
-                    else:
-                        return datetime.combine(now.date(), end_time) - now
+            if (
+                start_time <= end_time
+                and start_time <= current_time < end_time
+                or start_time > end_time
+                and (current_time >= start_time or current_time < end_time)
+                and current_time < start_time
+            ):
+                return datetime.combine(now.date(), end_time) - now
+            elif start_time > end_time and current_time >= start_time:
+                return datetime.combine(now.date() + timedelta(days=1), end_time) - now
 
         # If not in quiet hours, find the next quiet hours period
         next_start = None
         for start, _ in self.quiet_hours:
             start_time = datetime.time(start[0], start[1])
-            if start_time > current_time:
-                if next_start is None or start_time < next_start:
-                    next_start = start_time
+            if start_time > current_time and (next_start is None or start_time < next_start):
+                next_start = start_time
 
-        if next_start is None:
-            # If no later period today, get the first period of the next day
-            next_start = datetime.time(self.quiet_hours[0][0][0], self.quiet_hours[0][0][1])
-            return datetime.combine(now.date() + timedelta(days=1), next_start) - now
-        else:
+        if next_start is not None:
             return datetime.combine(now.date(), next_start) - now
+
+        # If no later period today, get the first period of the next day
+        next_start = datetime.time(self.quiet_hours[0][0][0], self.quiet_hours[0][0][1])
+        return datetime.combine(now.date() + timedelta(days=1), next_start) - now
 
     def reset_kills(self):
         """Reset the kill count if the time has passed."""
