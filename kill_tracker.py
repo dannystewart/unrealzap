@@ -18,7 +18,7 @@ from time_tracker import TimeTracker
 class KillTracker:
     """Track kills."""
 
-    def __init__(self, test_mode):
+    def __init__(self, test_mode: bool) -> None:
         self.test_mode = test_mode
         self.logger = LocalLogger.setup_logger(self.__class__.__name__, message_only=True)
         self.config = ConfigManager()
@@ -28,7 +28,7 @@ class KillTracker:
         self.kill_count = 0
         self.zap_queue = deque(maxlen=100)  # Store last 100 zap times
 
-    def handle_kill(self):
+    def handle_kill(self) -> None:
         """Handle a single kill event."""
         now = datetime.now()
 
@@ -37,9 +37,7 @@ class KillTracker:
             return
 
         if self.time.during_quiet_hours():
-            self.rate_limited_log(
-                "Zap detected during quiet hours. Not counting kill.", logging.DEBUG
-            )
+            self.rate_limited_log("Zap detected during quiet hours. Not counting kill.", logging.DEBUG)
             return
 
         if not self.handle_multi_kill(now):
@@ -50,7 +48,7 @@ class KillTracker:
 
         self.logger.debug("Kills so far today (excluding multi-kills): %s", self.kill_count)
 
-    def handle_regular_kill(self):
+    def handle_regular_kill(self) -> None:
         """Handle regular kill logic."""
         if self.time.last_kill_time and not self.time.multi_kill_expired:
             self.time.multi_kill_window_expired()
@@ -63,25 +61,20 @@ class KillTracker:
             sound = next(filter(lambda x: x[2] == self.kill_count, self.audio.kill_sounds))
             self.audio.play_sound(sound[1], sound[0])
 
-    def handle_multi_kill(self, now):
+    def handle_multi_kill(self, now: datetime) -> bool:
         """Handle multi-kill logic."""
-        if (
-            self.time.last_kill_time
-            and now - self.time.last_kill_time <= self.time.multi_kill_window
-        ):
+        if self.time.last_kill_time and now - self.time.last_kill_time <= self.time.multi_kill_window:
             self.multi_kill_count += 1
             if self.multi_kill_count in [sound[2] for sound in self.audio.multi_kill_sounds]:
-                sound = next(
-                    filter(lambda x: x[2] == self.multi_kill_count, self.audio.multi_kill_sounds)
-                )
+                sound = next(filter(lambda x: x[2] == self.multi_kill_count, self.audio.multi_kill_sounds))
                 self.audio.play_sound(sound[1], sound[0])
             return True
         return False
 
-    def handle_test_mode(self):
+    def handle_test_mode(self) -> None:
         """Run the program in test mode."""
 
-        def check_expirations(self):
+        def check_expirations(self) -> None:
             while True:
                 self.time.check.multi_kill_window()
                 self.time.reset_kills()
@@ -89,6 +82,7 @@ class KillTracker:
 
         expiration_thread = threading.Thread(target=check_expirations, daemon=True)
         expiration_thread.start()
+
         while True:
             try:
                 self.logger.info(colored("Press any key to simulate a zap.", "green"))
@@ -99,7 +93,7 @@ class KillTracker:
                 self.logger.info("Exiting.")
                 sys.exit(0)
 
-    def handle_live_mode(self):
+    def handle_live_mode(self) -> None:
         """Run the program in live mode."""
         # Open the audio device with all parameters set at initialization
         inp = self.audio.init_audio_device()

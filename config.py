@@ -29,13 +29,13 @@ class ConfigManager:
         self.config_thread = threading.Thread(target=self.check_config_updates, daemon=True)
         self.config_thread.start()
 
-    def check_config_updates(self):
+    def check_config_updates(self) -> None:
         """Periodically check for configuration updates."""
         while True:
             self.update_config()
             time.sleep(self.config_check_interval)
 
-    def load_config(self):
+    def load_config(self) -> None:
         """Load configuration from file."""
         if os.path.exists(self.config_file):
             with open(self.config_file) as f:
@@ -43,7 +43,7 @@ class ConfigManager:
             self.logging_threshold = config.get("logging_threshold", 0.0)
             self.trigger_threshold = config.get("trigger_threshold", 120.0)
 
-    def update_config(self):
+    def update_config(self) -> None:
         """Update configuration from file."""
         old_logging = self.logging_threshold
         old_trigger = self.trigger_threshold

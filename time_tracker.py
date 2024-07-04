@@ -2,14 +2,18 @@ import threading
 import time as time_module
 from datetime import datetime, timedelta
 from datetime import time as datetime_time
+from typing import TYPE_CHECKING
 
 from dsutil.log import LocalLogger
+
+if TYPE_CHECKING:
+    from kill_tracker import KillTracker
 
 
 class TimeTracker:
     """Track time."""
 
-    def __init__(self, kill_tracker):
+    def __init__(self, kill_tracker: "KillTracker"):
         self.logger = LocalLogger.setup_logger(self.__class__.__name__, message_only=True)
 
         self.kill_tracker = kill_tracker
@@ -41,13 +45,13 @@ class TimeTracker:
         self.midnight_reset_thread = threading.Thread(target=self.reset_at_midnight, daemon=True)
         self.midnight_reset_thread.start()
 
-    def format_quiet_hours(self):
+    def format_quiet_hours(self) -> str:
         """Format quiet hours for logging."""
         return ", ".join(
             [f"{self.format_time(start)} to {self.format_time(end)}" for start, end in self.quiet_hours]
         )
 
-    def format_time(self, time_tuple):
+    def format_time(self, time_tuple: tuple[int, int]) -> str:
         """Format time tuple in 12-hour time without leading zeros."""
         hour, minute = time_tuple
         if hour == 0 and minute == 0:
@@ -59,7 +63,7 @@ class TimeTracker:
         else:
             return f"{hour - 12}:{minute:02d} PM"
 
-    def reset_at_midnight(self):
+    def reset_at_midnight(self) -> None:
         """Reset kills at midnight."""
         while True:
             now = datetime.now()
@@ -71,7 +75,7 @@ class TimeTracker:
             time_module.sleep(time_until_reset * 60)
             self.reset_kills()
 
-    def during_quiet_hours(self):
+    def during_quiet_hours(self) -> bool:
         """Check if the current time falls within any quiet hours window."""
         now = datetime.now().time()
         for start, end in self.quiet_hours:
@@ -86,7 +90,7 @@ class TimeTracker:
                 return True
         return False
 
-    def time_until_quiet_hours_end(self):
+    def time_until_quiet_hours_end(self) -> timedelta:
         """Calculate time until the end of the current or next quiet hours period."""
         now = datetime.now()
         current_time = now.time()
@@ -121,7 +125,7 @@ class TimeTracker:
         next_start = datetime.time(self.quiet_hours[0][0][0], self.quiet_hours[0][0][1])
         return datetime.combine(now.date() + timedelta(days=1), next_start) - now
 
-    def reset_kills(self):
+    def reset_kills(self) -> None:
         """Reset the kill count if the time has passed."""
         now = datetime.now()
         if now - self.start_time >= timedelta(hours=24):
@@ -130,7 +134,7 @@ class TimeTracker:
             self.last_kill_time = None
             self.start_time = now
 
-    def multi_kill_window_expired(self):
+    def multi_kill_window_expired(self) -> None:
         """Set the multi-kill window to expired."""
         multi_kills = self.kill_tracker.multi_kill_count - 1
         self.logger.debug(
@@ -140,7 +144,7 @@ class TimeTracker:
         )
         self.multi_kill_expired = True
 
-    def check_multi_kill_window(self):
+    def check_multi_kill_window(self) -> None:
         """Check if the multi-kill window has expired."""
         now = datetime.now()
         if (
@@ -150,7 +154,7 @@ class TimeTracker:
         ):
             self.multi_kill_window_expired()
 
-    def in_cooldown(self, now):
+    def in_cooldown(self, now: datetime) -> bool:
         """Check if we're still in the cooldown period."""
         if (
             self.last_detection_time

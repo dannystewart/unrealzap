@@ -1,17 +1,22 @@
-import alsaaudio
+import alsaaudio  # type: ignore # noqa: I201
 import numpy as np
 import pygame
 from termcolor import colored
 
 from dsutil.log import LocalLogger
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from kill_tracker import KillTracker
 
 
 class AudioHelper:
     """Helper class for audio handling."""
 
-    def __init__(self, bug_zapper):
+    def __init__(self, kill_tracker: "KillTracker"):
         self.logger = LocalLogger.setup_logger(self.__class__.__name__, message_only=True)
-        self.bug_zapper = bug_zapper
+
+        self.kill_tracker = kill_tracker
 
         # Sounds and corresponding thresholds
         self.headshot_sound = "sounds/headshot.wav"
@@ -39,7 +44,7 @@ class AudioHelper:
 
         self.init_mixer()
 
-    def init_audio_device(self):
+    def init_audio_device(self) -> alsaaudio.PCM:
         """Open the audio device with all parameters set at initialization."""
         return alsaaudio.PCM(
             alsaaudio.PCM_CAPTURE,
@@ -51,7 +56,7 @@ class AudioHelper:
             periodsize=1024,
         )
 
-    def init_mixer(self):
+    def init_mixer(self) -> bool:
         """Initialize the Pygame mixer."""
         try:
             pygame.mixer.quit()
@@ -62,7 +67,7 @@ class AudioHelper:
             self.logger.error("Failed to initialize Pygame mixer: %s", str(e))
             return False
 
-    def play_sound(self, file, label):
+    def play_sound(self, file: str, label: str) -> None:
         """Play the sound file and log the event."""
         self.logger.info("Playing sound: %s", label)
         try:
@@ -79,14 +84,12 @@ class AudioHelper:
                 else:
                     self.logger.error("Unable to reinitialize mixer. Sound playback failed.")
 
-    def audio_callback(self, in_data, frames, time_info, status):  # noqa: ARG001,ARG002
+    def audio_callback(self, in_data, frames, time_info, status) -> None:  # noqa: ARG001,ARG002
         """Audio callback function to handle the audio input."""
         if status:
             self.logger.debug("Status: %s", status)
 
-        self.logger.debug(
-            "Received audio data length: %s. Expected frames: %s", len(in_data), frames
-        )
+        self.logger.debug("Received audio data length: %s. Expected frames: %s", len(in_data), frames)
 
         if len(in_data) <= 0:
             self.logger.warning("Received non-positive audio data length: %s", len(in_data))
@@ -111,13 +114,13 @@ class AudioHelper:
         mean_square = np.mean(np.abs(audio_data) ** 2)
         volume = np.sqrt(np.maximum(mean_square, 1e-10))  # Avoid sqrt of values very close to zero
 
-        if volume > self.bug_zapper.config.logging_threshold:
+        if volume > self.kill_tracker.config.logging_threshold:
             self.logger.debug("Volume: %s", volume)
-        if volume > self.bug_zapper.config.trigger_threshold:
+        if volume > self.kill_tracker.config.trigger_threshold:
             self.logger.info(colored("Zap detected!", "red"))
-            self.bug_zapper.handle_kill()
+            self.kill_tracker.handle_kill()
 
-    def reset_internal_state(self):
+    def reset_internal_state(self) -> None:
         """Reset the error count and any other internal state variables."""
         self.error_count = 0
         self.logger.info("Internal state reset complete.")
