@@ -23,7 +23,7 @@ class TimeTracker:
 
         # Quiet hours (don't play sounds during these windows)
         self.quiet_hours = [
-            ((0, 0), (8, 30)),  # 12 AM to 8:30 AM
+            ((23, 0), (8, 30)),  # 11 PM to 8:30 AM
             ((19, 45), (20, 30)),  # 7:45 PM to 8:30 PM
         ]
 
@@ -31,7 +31,9 @@ class TimeTracker:
         self.multi_kill_window_test = timedelta(seconds=3)
         self.multi_kill_window_live = timedelta(minutes=2)
         self.multi_kill_window = (
-            self.multi_kill_window_test if self.kill_tracker.test_mode else self.multi_kill_window_live
+            self.multi_kill_window_test
+            if self.kill_tracker.test_mode
+            else self.multi_kill_window_live
         )
         self.start_time = datetime.now()
         self.last_detection_time = None
@@ -48,7 +50,10 @@ class TimeTracker:
     def format_quiet_hours(self) -> str:
         """Format quiet hours for logging."""
         return ", ".join(
-            [f"{self.format_time(start)} to {self.format_time(end)}" for start, end in self.quiet_hours]
+            [
+                f"{self.format_time(start)} to {self.format_time(end)}"
+                for start, end in self.quiet_hours
+            ]
         )
 
     def format_time(self, time_tuple: tuple[int, int]) -> str:
@@ -97,24 +102,23 @@ class TimeTracker:
 
         # Check if we're currently in a quiet hours period
         for start, end in self.quiet_hours:
-            start_time = datetime.time(start[0], start[1])
-            end_time = datetime.time(end[0], end[1])
-
+            start_time = datetime_time(start[0], start[1])
+            end_time = datetime_time(end[0], end[1])
             if (
                 start_time <= end_time
                 and start_time <= current_time < end_time
                 or start_time > end_time
                 and (current_time >= start_time or current_time < end_time)
-                and current_time < start_time
             ):
-                return datetime.combine(now.date(), end_time) - now
-            elif start_time > end_time and current_time >= start_time:
-                return datetime.combine(now.date() + timedelta(days=1), end_time) - now
+                if current_time < end_time:
+                    return datetime.combine(now.date(), end_time) - now
+                else:
+                    return datetime.combine(now.date() + timedelta(days=1), end_time) - now
 
         # If not in quiet hours, find the next quiet hours period
         next_start = None
         for start, _ in self.quiet_hours:
-            start_time = datetime.time(start[0], start[1])
+            start_time = datetime_time(start[0], start[1])
             if start_time > current_time and (next_start is None or start_time < next_start):
                 next_start = start_time
 
@@ -122,7 +126,7 @@ class TimeTracker:
             return datetime.combine(now.date(), next_start) - now
 
         # If no later period today, get the first period of the next day
-        next_start = datetime.time(self.quiet_hours[0][0][0], self.quiet_hours[0][0][1])
+        next_start = datetime_time(self.quiet_hours[0][0][0], self.quiet_hours[0][0][1])
         return datetime.combine(now.date() + timedelta(days=1), next_start) - now
 
     def reset_kills(self) -> None:
