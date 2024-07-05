@@ -1,3 +1,4 @@
+import json
 import sqlite3
 from datetime import date, datetime
 
@@ -7,24 +8,108 @@ from dsutil.log import LocalLogger
 class DatabaseHelper:
     """Helper class for database access."""
 
-    def __init__(self):
+    def __init__(self, db_file="bug_zapper.db"):
         self.logger = LocalLogger.setup_logger(self.__class__.__name__)
-        self.db_file = "bug_zapper_scores.db"
+        self.db_file = db_file
+        self.init_db()
 
     def init_db(self):
         """Initialize the database."""
         with sqlite3.connect(self.db_file) as conn:
             cursor = conn.cursor()
             cursor.execute("""
-            CREATE TABLE IF NOT EXISTS daily_scores
-            (date TEXT PRIMARY KEY, score INTEGER)
-            """)
-            cursor.execute("""
-            CREATE TABLE IF NOT EXISTS kills
-            (id INTEGER PRIMARY KEY AUTOINCREMENT,
+            CREATE TABLE IF NOT EXISTS audio_events (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
                 timestamp TEXT,
-                hour INTEGER)
+                duration REAL,
+                dominant_frequency REAL,
+                high_energy_ratio REAL,
+                peak_amplitude REAL,
+                is_zap BOOLEAN,
+                audio_features TEXT
+            )
             """)
+            conn.commit()
+
+    def record_audio_event(
+        self,
+        duration,
+        dominant_frequency,
+        high_energy_ratio,
+        peak_amplitude,
+        audio_features,
+        is_zap=None,
+    ):
+        """Record an audio event."""
+        timestamp = datetime.now().isoformat()
+        with sqlite3.connect(self.db_file) as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+            INSERT INTO audio_events
+            (timestamp, duration, dominant_frequency, high_energy_ratio, peak_amplitude, is_zap, audio_features)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+                (
+                    timestamp,
+                    duration,
+                    dominant_frequency,
+                    high_energy_ratio,
+                    peak_amplitude,
+                    is_zap,
+                    json.dumps(audio_features),
+                ),
+            )
+            conn.commit()
+
+    def get_recent_events(self, limit=10):
+        """Get recent audio events."""
+        with sqlite3.connect(self.db_file) as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+            SELECT * FROM audio_events
+            ORDER BY timestamp DESC
+            LIMIT ?
+            """,
+                (limit,),
+            )
+            return cursor.fetchall()
+
+    def get_zap_statistics(self):
+        """Get statistics about zap events."""
+        with sqlite3.connect(self.db_file) as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+            SELECT
+                AVG(duration) as avg_duration,
+                AVG(dominant_frequency) as avg_frequency,
+                AVG(high_energy_ratio) as avg_energy_ratio,
+                AVG(peak_amplitude) as avg_amplitude
+            FROM audio_events
+            WHERE is_zap = 1
+            """)
+            return cursor.fetchone()
+
+    def get_all_events(self):
+        """Get all audio events for analysis."""
+        with sqlite3.connect(self.db_file) as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM audio_events")
+            return cursor.fetchall()
+
+    def update_zap_status(self, event_id, is_zap):
+        """Update whether an event was a zap or not."""
+        with sqlite3.connect(self.db_file) as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+            UPDATE audio_events
+            SET is_zap = ?
+            WHERE id = ?
+            """,
+                (is_zap, event_id),
+            )
             conn.commit()
 
     def update_score(self):
