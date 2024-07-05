@@ -5,11 +5,25 @@
 		}
 	],
 	"settings": {
-		"ruff.format.args": [
-			"--config=pyproject.toml"
-		],
 		"[python]": {
 			"editor.defaultFormatter": "charliermarsh.ruff"
+		},
+		"explorerExclude.backup": {},
+		"files.exclude": {
+			"**/.DS_Store": true,
+			"**/.git": true,
+			"**/.hg": false,
+			"**/.pytest_cache": true,
+			"**/.svn": false,
+			"**/.vscode": true,
+			"**/__pycache__": true,
+			"**/CVS": false,
+			"**/node_modules": true,
+			"**/Thumbs.db": true,
+			".history": true,
+			"bug_zapper.db-journal": true,
+			"env*": true,
+			"venv": true
 		},
 		"mypy-type-checker.args": [
 			"--config-file=app/pyproject.toml",
@@ -24,6 +38,7 @@
 			"--check_untyped_defs",
 			"true",
 		],
+		"peacock.remoteColor": "#832561",
 		"python.analysis.extraPaths": [
 			".",
 			"/home/danny/bug-zapper"
@@ -32,6 +47,9 @@
 			".",
 			"/home/danny/bug_zapper"
 		],
+		"ruff.format.args": [
+			"--config=pyproject.toml"
+		],
 		"workbench.colorCustomizations": {
 			"sash.hoverBorder": "#ab307e",
 			"statusBar.background": "#832561",
@@ -39,7 +57,6 @@
 			"statusBarItem.hoverBackground": "#ab307e",
 			"statusBarItem.remoteBackground": "#832561",
 			"statusBarItem.remoteForeground": "#e7e7e7"
-		},
-		"peacock.remoteColor": "#832561",
+		}
 	}
 }
