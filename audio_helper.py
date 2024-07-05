@@ -125,40 +125,50 @@ class AudioHelper:
         # Frequency analysis
         dominant_freq, low_energy, mid_energy, high_energy = self.analyze_frequency(audio_data)
 
-        # Check for high frequency dominance (typical of electrical discharges)
-        if dominant_freq < 5000:  # Adjust this threshold based on your observations
-            return False
-
-        # Check for energy distribution (zaps should have more energy in high frequencies)
+        # Calculate energy ratios
         total_energy = low_energy + mid_energy + high_energy
         if total_energy == 0:
             return False
         high_energy_ratio = high_energy / total_energy
-        if high_energy_ratio < 0.5:  # Adjust this threshold as needed
-            return False
 
         # Waveform shape analysis
         envelope = np.abs(audio_data)
         peaks, _ = find_peaks(
             envelope, height=np.max(envelope) * 0.8, distance=len(audio_data) // 2
         )
-        if len(peaks) != 1:  # We expect one clear peak for a zap
-            return False
 
         # Check for sharp rise and quick decay
+        if len(peaks) == 1:
+            peak_index = peaks[0]
+            rise_time = peak_index / self.sample_rate
+            decay_time = (len(audio_data) - peak_index) / self.sample_rate
+        else:
+            rise_time = decay_time = None
+
+        # Calculate peak amplitude
+        peak_amplitude = np.max(np.abs(audio_data))
         peak_index = peaks[0]
         rise_time = peak_index / self.sample_rate
         decay_time = (len(audio_data) - peak_index) / self.sample_rate
         if rise_time > 0.01 or decay_time > 0.05:  # Adjust these thresholds as needed
             return False
 
-        # Log the characteristics of the detected zap
+        # Log the characteristics of the detected event
         self.logger.debug(
-            "Potential zap detected - Duration: %(duration).3fs, Dominant Frequency: %(freq).2fHz, High Energy Ratio: %(ratio).2f",
+            "Audio event detected - Duration: %(duration).3fs, Dominant Frequency: %(freq).2fHz, High Energy Ratio: %(ratio).2f",
             {"duration": duration, "freq": dominant_freq, "ratio": high_energy_ratio},
         )
 
-        return True
+        # Determine if it's a zap based on our criteria
+        is_zap = (
+            dominant_freq >= 5000
+            and high_energy_ratio >= 0.5
+            and len(peaks) == 1
+            and (rise_time is not None and rise_time <= 0.01)
+            and (decay_time is not None and decay_time <= 0.05)
+        )
+
+        return is_zap
 
     def audio_callback(self, in_data, frames, time_info, status) -> None:  # noqa: ARG001,ARG002
         """Audio callback function to handle the audio input."""
