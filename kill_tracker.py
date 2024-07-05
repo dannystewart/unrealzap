@@ -30,6 +30,10 @@ class KillTracker:
         self.kill_count = 0
         self.zap_queue = deque(maxlen=100)  # Store last 100 zap times
 
+        # Set up threaded database maintenance
+        self.maintenance_thread = threading.Thread(target=self.periodic_maintenance, daemon=True)
+        self.maintenance_thread.start()
+
     def handle_kill(self) -> None:
         """Handle a single kill event."""
         now = datetime.now()
@@ -125,3 +129,16 @@ class KillTracker:
                 self.logger.error("Error in audio processing: %s", str(e))
                 time.sleep(1)  # Wait a bit before trying again
                 inp = self.audio.init_audio_device()  # Reinitialize audio device
+
+    def periodic_maintenance(self):
+        """Periodically perform database maintenance in a separate thread."""
+        while True:
+            try:
+                self.logger.info("Starting database maintenance...")
+                self.db_helper.maintain_database()
+                self.logger.info("Database maintenance completed.")
+            except Exception as e:
+                self.logger.error(f"Error during database maintenance: {str(e)}")
+
+            # Sleep for 1 hour before next maintenance
+            time.sleep(3600)
