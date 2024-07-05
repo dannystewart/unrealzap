@@ -37,7 +37,9 @@ class KillTracker:
             return
 
         if self.time.during_quiet_hours():
-            self.rate_limited_log("Zap detected during quiet hours. Not counting kill.", logging.DEBUG)
+            self.rate_limited_log(
+                "Zap detected during quiet hours. Not counting kill.", logging.DEBUG
+            )
             return
 
         if not self.handle_multi_kill(now):
@@ -63,10 +65,15 @@ class KillTracker:
 
     def handle_multi_kill(self, now: datetime) -> bool:
         """Handle multi-kill logic."""
-        if self.time.last_kill_time and now - self.time.last_kill_time <= self.time.multi_kill_window:
+        if (
+            self.time.last_kill_time
+            and now - self.time.last_kill_time <= self.time.multi_kill_window
+        ):
             self.multi_kill_count += 1
             if self.multi_kill_count in [sound[2] for sound in self.audio.multi_kill_sounds]:
-                sound = next(filter(lambda x: x[2] == self.multi_kill_count, self.audio.multi_kill_sounds))
+                sound = next(
+                    filter(lambda x: x[2] == self.multi_kill_count, self.audio.multi_kill_sounds)
+                )
                 self.audio.play_sound(sound[1], sound[0])
             return True
         return False
@@ -85,9 +92,9 @@ class KillTracker:
 
         while True:
             try:
-                self.logger.info(colored("Press any key to simulate a zap.", "green"))
+                self.logger.info(color("Press any key to simulate a zap.", "green"))
                 get_single_char_input()
-                self.logger.debug(colored("Zap!", "cyan"))
+                self.logger.debug(color("Zap!", "cyan"))
                 self.handle_kill()
             except KeyboardInterrupt:
                 self.logger.info("Exiting.")
@@ -95,7 +102,6 @@ class KillTracker:
 
     def handle_live_mode(self) -> None:
         """Run the program in live mode."""
-        # Open the audio device with all parameters set at initialization
         inp = self.audio.init_audio_device()
         self.logger.info("Audio stream started successfully.")
 
