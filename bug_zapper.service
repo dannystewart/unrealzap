@@ -1,5 +1,5 @@
 [Unit]
-Description=Bug Zapper Kill Streak Tracker
+Description=Bug Zapper Kill Tracker
 After=network.target sound.target
 Wants=sound.target
 

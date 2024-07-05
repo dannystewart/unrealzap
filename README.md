@@ -1,4 +1,4 @@
-# Bug Zapper Kill Streak Tracker
+# Bug Zapper Kill Tracker
 
 Based on Ian's amazing idea to have the Unreal Tournament kill streak sounds play when the bug zapper goes off, this script makes that dream a reality.
 
@@ -66,23 +66,27 @@ sudo nano /etc/systemd/system/bug_zapper.service
 
 Configure like so:
 
-```
+```bash
 [Unit]
 Description=Bug Zapper Kill Streak Tracker
 After=network.target sound.target
+Wants=sound.target
 
 [Service]
-ExecStart=/home/danny/.cache/pypoetry/virtualenvs/bug-zapper-EZ41eyuC-py3.12/bin/python /path/to/project/bug_zapper.py
-WorkingDirectory=/home/danny/bug-zapper
+ExecStart=/path/to/python /path/to/bug_zapper/bug_zapper.py
+WorkingDirectory=/path/to/bug-zapper
 StandardOutput=journal
 StandardError=journal
-Restart=always
+Restart=on-failure
+RestartSec=5
 User=danny
 Group=audio
-Environment=PATH=/home/danny/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin  # May need adjustment
 Environment=PYTHONUNBUFFERED=1
 Environment=XDG_RUNTIME_DIR=/run/user/1000
+Environment=ALSA_CARD=S3
 TimeoutStopSec=10
+Nice=-10
 
 [Install]
 WantedBy=multi-user.target
