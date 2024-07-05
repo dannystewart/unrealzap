@@ -89,7 +89,8 @@ class DatabaseHelper:
             FROM audio_events
             WHERE is_zap = 1
             """)
-            return cursor.fetchone()
+            stats = cursor.fetchone()
+            return stats if stats and all(stat is not None for stat in stats) else None
 
     def get_all_events(self):
         """Get all audio events for analysis."""

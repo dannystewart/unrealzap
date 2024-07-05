@@ -54,16 +54,19 @@ def analysis_mode(db_helper: DatabaseHelper) -> None:
 
         if choice == "1":
             events = db_helper.get_recent_events(10)
-            for event in events:
-                print(
-                    f"ID: {event[0]}, Time: {event[1]}, Duration: {event[2]:.3f}, "
-                    f"Dominant Freq: {event[3]:.2f}, High Energy Ratio: {event[4]:.2f}"
-                )
-                if confirm_action("Was this a zap?"):
-                    db_helper.update_zap_status(event[0], True)
+            if not events:
+                print("No recent events found.")
+            else:
+                for event in events:
+                    print(
+                        f"ID: {event[0]}, Time: {event[1]}, Duration: {event[2]:.3f}, "
+                        f"Dominant Freq: {event[3]:.2f}, High Energy Ratio: {event[4]:.2f}"
+                    )
+                    if confirm_action("Was this a zap?", prompt_color="yellow"):
+                        db_helper.update_zap_status(event[0], True)
         elif choice == "2":
             stats = db_helper.get_zap_statistics()
-            if stats:
+            if stats and all(stat is not None for stat in stats):
                 print(f"Average Duration: {stats[0]:.3f}")
                 print(f"Average Dominant Frequency: {stats[1]:.2f}")
                 print(f"Average High Energy Ratio: {stats[2]:.2f}")
