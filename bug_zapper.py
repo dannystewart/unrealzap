@@ -1,9 +1,12 @@
-"""Bug zapper kill streak tracker."""
+"""Bug zapper kill tracker."""
 
+import argparse
 import signal
 import sys
 
+from db_helper import DatabaseHelper
 from dsutil.log import LocalLogger
+from dsutil.shell import confirm_action
 from kill_tracker import KillTracker
 
 # Set TEST_MODE to True for testing mode (manual trigger)
@@ -41,28 +44,63 @@ def check_for_quiet_hours(kill_tracker):
         logger.debug("Not currently in quiet hours.")
 
 
-def main():
-    """Start the audio stream and handle the logic."""
+def analysis_mode(db_helper: DatabaseHelper) -> None:
+    """Enter analysis mode to monitor recent events and statistics."""
+    while True:
+        print("\n1. View recent events")
+        print("2. View zap statistics")
+        print("3. Exit")
+        choice = input("Enter your choice: ")
+
+        if choice == "1":
+            events = db_helper.get_recent_events(10)
+            for event in events:
+                print(
+                    f"ID: {event[0]}, Time: {event[1]}, Duration: {event[2]:.3f}, "
+                    f"Dominant Freq: {event[3]:.2f}, High Energy Ratio: {event[4]:.2f}"
+                )
+                if confirm_action("Was this a zap?"):
+                    db_helper.update_zap_status(event[0], True)
+        elif choice == "2":
+            stats = db_helper.get_zap_statistics()
+            if stats:
+                print(f"Average Duration: {stats[0]:.3f}")
+                print(f"Average Dominant Frequency: {stats[1]:.2f}")
+                print(f"Average High Energy Ratio: {stats[2]:.2f}")
+                print(f"Average Peak Amplitude: {stats[3]:.2f}")
+            else:
+                print("No zap statistics available yet.")
+        elif choice == "3":
+            break
+        else:
+            print("Invalid choice. Please try again.")
+
+
+def main() -> None:
+    """Start the audio stream and handle the logic based on command line arguments."""
+    parser = argparse.ArgumentParser(description="Bug Zapper Kill Tracker")
+    parser.add_argument("--test", action="store_true", help="Run in test mode")
+    parser.add_argument("--analysis", action="store_true", help="Run in analysis mode")
+    args = parser.parse_args()
+
     signal.signal(signal.SIGTERM, signal_handler)
 
-    kill_tracker = KillTracker(TEST_MODE)
-    logger.info("Started bug zapper kill streak tracker.")
+    db_helper = DatabaseHelper()
+    kill_tracker = KillTracker(args.test, db_helper)
+
+    logger.info("Started bug zapper kill tracker.")
 
     check_for_quiet_hours(kill_tracker)
 
-    if kill_tracker.test_mode:
+    if args.test:
+        logger.info("Running in test mode.")
         kill_tracker.handle_test_mode()
-
+    elif args.analysis:
+        logger.info("Running in analysis mode.")
+        analysis_mode(db_helper)
     else:
-        while RUNNING:
-            try:
-                kill_tracker.handle_live_mode()
-            except KeyboardInterrupt:
-                logger.info("Exiting.")
-                sys.exit(0)
-            except Exception as e:
-                logger.error("Failed to start audio stream: %s", str(e))
-                sys.exit(1)
+        logger.info("Running in live mode.")
+        kill_tracker.handle_live_mode()
 
 
 if __name__ == "__main__":

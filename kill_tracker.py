@@ -4,27 +4,29 @@ import threading
 import time
 from collections import deque
 from datetime import datetime
-
-from termcolor import colored
+from typing import TYPE_CHECKING
 
 from audio_helper import AudioHelper
 from config import ConfigManager
-from db_helper import DatabaseHelper
 from dsutil.log import LocalLogger
 from dsutil.shell import get_single_char_input
+from dsutil.text import color
 from time_tracker import TimeTracker
+
+if TYPE_CHECKING:
+    from db_helper import DatabaseHelper
 
 
 class KillTracker:
     """Track kills."""
 
-    def __init__(self, test_mode: bool) -> None:
+    def __init__(self, test_mode: bool, db_helper: "DatabaseHelper") -> None:
         self.test_mode = test_mode
         self.logger = LocalLogger.setup_logger(self.__class__.__name__, message_only=True)
         self.config = ConfigManager()
-        self.db_helper = DatabaseHelper()
+        self.db_helper = db_helper
         self.time = TimeTracker(self)
-        self.audio = AudioHelper(self)
+        self.audio = AudioHelper(self, db_helper)
         self.kill_count = 0
         self.zap_queue = deque(maxlen=100)  # Store last 100 zap times
 

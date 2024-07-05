@@ -8,17 +8,18 @@ from scipy.signal import find_peaks
 from termcolor import colored
 
 from dsutil.log import LocalLogger
-from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from db_helper import DatabaseHelper
     from kill_tracker import KillTracker
 
 
 class AudioHelper:
     """Helper class for audio handling."""
 
-    def __init__(self, kill_tracker: "KillTracker"):
+    def __init__(self, kill_tracker: "KillTracker", db_helper: "DatabaseHelper"):
         self.logger = LocalLogger.setup_logger(self.__class__.__name__, message_only=True)
+        self.db_helper = db_helper
 
         self.kill_tracker = kill_tracker
 
@@ -147,11 +148,20 @@ class AudioHelper:
 
         # Calculate peak amplitude
         peak_amplitude = np.max(np.abs(audio_data))
-        peak_index = peaks[0]
-        rise_time = peak_index / self.sample_rate
-        decay_time = (len(audio_data) - peak_index) / self.sample_rate
-        if rise_time > 0.01 or decay_time > 0.05:  # Adjust these thresholds as needed
-            return False
+
+        # Additional features
+        audio_features = {
+            "low_energy": low_energy,
+            "mid_energy": mid_energy,
+            "high_energy": high_energy,
+            "rise_time": rise_time,
+            "decay_time": decay_time,
+        }
+
+        # Record the event
+        self.db_helper.record_audio_event(
+            duration, dominant_freq, high_energy_ratio, peak_amplitude, audio_features
+        )
 
         # Log the characteristics of the detected event
         self.logger.debug(
