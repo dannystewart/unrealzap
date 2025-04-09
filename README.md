@@ -1,4 +1,4 @@
-# Bug Zapper Kill Tracker
+# Unreal Zap
 
 Based on an amazing idea to have the Unreal Tournament kill streak sounds play when the bug zapper goes off, this script makes that dream a reality.
 
@@ -39,43 +39,28 @@ sudo apt update
 sudo apt upgrade
 ```
 
-Install Poetry:
+Install using pip:
 
 ```bash
-curl -sSL https://install.python-poetry.org | python3 -
-```
-
-Add Poetry to your PATH (if not done automatically):
-
-```bash
-export PATH="$HOME/.local/bin:$PATH"
-```
-
-Clone the project and set up the virtual environment:
-
-```bash
-cd /path/to/project
-poetry env use 3.12  # or whatever your Python version is
-poetry install --no-root
+pip install unrealzap
 ```
 
 Create a `systemd` service to run the script on startup:
 
 ```bash
-sudo nano /etc/systemd/system/bug_zapper.service
+sudo nano /etc/systemd/system/unrealzap.service
 ```
 
 Configure like so:
 
 ```bash
 [Unit]
-Description=Bug Zapper Kill Streak Tracker
+Description=Unreal Zap
 After=network.target sound.target
 Wants=sound.target
 
 [Service]
-ExecStart=/path/to/python /path/to/bug_zapper/bug_zapper.py
-WorkingDirectory=/path/to/bug-zapper
+ExecStart=/path/to/python -m unrealzap.bug_zapper:main
 StandardOutput=journal
 StandardError=journal
 Restart=on-failure
@@ -96,9 +81,9 @@ WantedBy=multi-user.target
 Enable and start the service, and check the status to confirm:
 
 ```bash
-sudo systemctl enable --now bug_zapper.service
-sudo systemctl start bug_zapper.service
-sudo systemctl status bug_zapper.service
+sudo systemctl enable --now unrealzap.service
+sudo systemctl start unrealzap.service
+sudo systemctl status unrealzap.service
 ```
 
 M-M-M-M-MONSTER KILL!
