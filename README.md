@@ -1,6 +1,6 @@
 # Bug Zapper Kill Tracker
 
-Based on Ian's amazing idea to have the Unreal Tournament kill streak sounds play when the bug zapper goes off, this script makes that dream a reality.
+Based on an amazing idea to have the Unreal Tournament kill streak sounds play when the bug zapper goes off, this script makes that dream a reality.
 
 It listens to microphone input and waits for a burst of sound over a certain volume threshold, then plays the appropriate Unreal Tournament kill streak sound based on number of kills so far that day.
 
@@ -58,6 +58,7 @@ cd /path/to/project
 poetry env use 3.12  # or whatever your Python version is
 poetry install --no-root
 ```
+
 Create a `systemd` service to run the script on startup:
 
 ```bash

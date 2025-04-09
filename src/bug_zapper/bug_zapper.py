@@ -1,13 +1,15 @@
 """Bug zapper kill tracker."""
 
+from __future__ import annotations
+
 import argparse
 import signal
 import sys
 
-from db_helper import DatabaseHelper
-from dsutil.log import LocalLogger
-from dsutil.shell import confirm_action
-from kill_tracker import KillTracker
+from polykit.log import PolyLog
+
+from bug_zapper.db_helper import DatabaseHelper
+from bug_zapper.kill_tracker import KillTracker
 
 # Set TEST_MODE to True for testing mode (manual trigger)
 TEST_MODE = False
@@ -16,10 +18,10 @@ TEST_MODE = False
 RUNNING = True
 
 # Set up logger
-logger = LocalLogger.setup_logger("main", message_only=True)
+logger = PolyLog.get_logger("main", simple=True)
 
 
-def signal_handler(sig, frame):  # noqa: ARG001
+def signal_handler(sig, frame):  # type: ignore # noqa: ARG001
     """Signal handler to shut down the program."""
     print("Received shutdown signal. Exiting gracefully...")
     sys.exit(0)
@@ -29,7 +31,7 @@ def signal_handler(sig, frame):  # noqa: ARG001
 signal.signal(signal.SIGTERM, signal_handler)
 
 
-def check_for_quiet_hours(kill_tracker):
+def check_for_quiet_hours(kill_tracker: KillTracker) -> None:
     """Check for quiet hours and log."""
     if kill_tracker.time.during_quiet_hours():
         time_left = kill_tracker.time.time_until_quiet_hours_end()
@@ -62,11 +64,9 @@ def analysis_mode(db_helper: DatabaseHelper) -> None:
                         f"ID: {event[0]}, Time: {event[1]}, Duration: {event[2]:.3f}, "
                         f"Dominant Freq: {event[3]:.2f}, High Energy Ratio: {event[4]:.2f}"
                     )
-                    if confirm_action("Was this a zap?", prompt_color="yellow"):
-                        db_helper.update_zap_status(event[0], True)
         elif choice == "2":
             stats = db_helper.get_zap_statistics()
-            if stats and all(stat is not None for stat in stats):
+            if stats and all(stat for stat in stats):
                 print(f"Average Duration: {stats[0]:.3f}")
                 print(f"Average Dominant Frequency: {stats[1]:.2f}")
                 print(f"Average High Energy Ratio: {stats[2]:.2f}")

@@ -1,32 +1,39 @@
+from __future__ import annotations
+
 import json
+import signal
 import sqlite3
 import threading
-from datetime import date, datetime, timedelta
-
-from dsutil.log import LocalLogger
-import signal
 import time
+from datetime import datetime, timedelta
+from pathlib import Path
+from typing import TYPE_CHECKING
+
+from polykit.formatters import TZ
+from polykit.log import PolyLog
+
+if TYPE_CHECKING:
+    from types import FrameType
 
 
 class DatabaseHelper:
     """Helper class for database access."""
 
-    def __init__(self, db_file="bug_zapper.db"):
-        self.logger = LocalLogger.setup_logger(self.__class__.__name__)
-        self.db_file = db_file
+    def __init__(self, db_file: str = "bug_zapper.db"):
+        self.logger = PolyLog.get_logger(self.__class__.__name__)
+        self.db_file: str = db_file
         self.lock = threading.Lock()
         self.init_db()
 
-    def get_connection(self):
+    def get_connection(self) -> sqlite3.Connection:
         """Get a new database connection."""
         return sqlite3.connect(self.db_file)
 
     def init_db(self):
         """Initialize the database with optimized schema."""
-        with self.lock:
-            with self.get_connection() as conn:
-                cursor = conn.cursor()
-                cursor.execute("""
+        with self.lock, self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
                 CREATE TABLE IF NOT EXISTS audio_events (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     timestamp TEXT,
@@ -38,72 +45,69 @@ class DatabaseHelper:
                     audio_features TEXT
                 )
                 """)
-                cursor.execute(
-                    "CREATE INDEX IF NOT EXISTS idx_timestamp ON audio_events(timestamp)"
-                )
-                conn.commit()
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_timestamp ON audio_events(timestamp)")
+            conn.commit()
 
     def record_audio_event(
         self,
-        duration,
-        dominant_frequency,
-        high_energy_ratio,
-        peak_amplitude,
-        audio_features,
-        is_zap=None,
+        duration: float,
+        dominant_frequency: float,
+        high_energy_ratio: float,
+        peak_amplitude: float,
+        audio_features: dict[str, float],
+        is_zap: bool | None = None,
     ):
         """Record an audio event, with potential zap detection."""
-        timestamp = datetime.now().isoformat()
+        timestamp = datetime.now(tz=TZ).isoformat()
 
         if self.might_be_zap(duration, dominant_frequency, high_energy_ratio):
-            with self.lock:
-                with self.get_connection() as conn:
-                    cursor = conn.cursor()
-                    cursor.execute(
-                        """
+            with self.lock and self.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    """
                     INSERT INTO audio_events
                     (timestamp, duration, dominant_frequency, high_energy_ratio, peak_amplitude, is_zap, audio_features)
                     VALUES (?, ?, ?, ?, ?, ?, ?)
                     """,
-                        (
-                            timestamp,
-                            duration,
-                            dominant_frequency,
-                            high_energy_ratio,
-                            peak_amplitude,
-                            is_zap,
-                            json.dumps(audio_features),
-                        ),
-                    )
-                    conn.commit()
+                    (
+                        timestamp,
+                        duration,
+                        dominant_frequency,
+                        high_energy_ratio,
+                        peak_amplitude,
+                        is_zap,
+                        json.dumps(audio_features),
+                    ),
+                )
+                conn.commit()
 
-    def might_be_zap(self, duration, dominant_frequency, high_energy_ratio):
+    def might_be_zap(
+        self, duration: float, dominant_frequency: float, high_energy_ratio: float
+    ) -> bool:
         """Determine if an event might be a zap based on basic criteria."""
         return duration < 0.1 and dominant_frequency > 5000 and high_energy_ratio > 0.5
 
-    def get_recent_events(self, limit=10):
+    def get_recent_events(self, limit: int = 10) -> list[tuple]:
         """Get recent audio events."""
-        with self.lock:
-            with self.get_connection() as conn:
-                cursor = conn.cursor()
-                cursor.execute(
-                    """
+        with self.lock, self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
                 SELECT * FROM audio_events
                 WHERE timestamp > ?
                 ORDER BY timestamp DESC
                 LIMIT ?
                 """,
-                    (datetime.now() - timedelta(days=7), limit),
-                )
-                return cursor.fetchall()
+                (datetime.now(tz=TZ) - timedelta(days=7), limit),
+            )
+            return cursor.fetchall()
 
-    def get_zap_statistics(self):
+    def get_zap_statistics(self) -> tuple[float, float, float, float]:
         """Get statistics about zap events from the last 30 days."""
-        with self.lock:
-            with self.get_connection() as conn:
-                cursor = conn.cursor()
-                cursor.execute(
-                    """
+        with self.lock, self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
                 SELECT
                     AVG(duration) as avg_duration,
                     AVG(dominant_frequency) as avg_frequency,
@@ -112,18 +116,16 @@ class DatabaseHelper:
                 FROM audio_events
                 WHERE is_zap = 1 AND timestamp > ?
                 """,
-                    (datetime.now() - timedelta(days=30),),
-                )
-                return cursor.fetchone()
+                (datetime.now(tz=TZ) - timedelta(days=30),),
+            )
+            return cursor.fetchone()
 
-    def get_database_size(self):
+    def get_database_size(self) -> float:
         """Get the current size of the database file in MB."""
-        import os
+        return Path(self.db_file).stat().st_size / (1024 * 1024)
 
-        return os.path.getsize(self.db_file) / (1024 * 1024)
-
-    def one_time_cleanup(self, batch_size=1000):  # noqa: ARG002
-        """Perform a one-time cleanup of the database to reduce its size, with progress reporting and safe interruption."""
+    def one_time_cleanup(self, batch_size: int = 1000):  # noqa: ARG002
+        """Perform a one-time cleanup of the database to reduce its size."""
         print("Starting one-time cleanup...")
         start_time = time.time()
 
@@ -132,7 +134,7 @@ class DatabaseHelper:
         original_sigterm_handler = signal.getsignal(signal.SIGTERM)
         cleanup_interrupted = False
 
-        def signal_handler(signum, frame):  # noqa: ARG001
+        def signal_handler(signum: int, frame: FrameType) -> None:  # noqa: ARG001
             nonlocal cleanup_interrupted
             cleanup_interrupted = True
             print("\nCleanup interrupted. Finishing current operation and exiting...")
@@ -220,20 +222,18 @@ class DatabaseHelper:
 
     def cleanup_old_data(self):
         """Remove data older than 30 days."""
-        with self.lock:
-            with self.get_connection() as conn:
-                cursor = conn.cursor()
-                cursor.execute(
-                    "DELETE FROM audio_events WHERE timestamp < ?",
-                    (datetime.now() - timedelta(days=30),),
-                )
-                conn.commit()
+        with self.lock, self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "DELETE FROM audio_events WHERE timestamp < ?",
+                (datetime.now(tz=TZ) - timedelta(days=30),),
+            )
+            conn.commit()
 
     def optimize_database(self):
         """Optimize the database to reduce its size."""
-        with self.lock:
-            with self.get_connection() as conn:
-                conn.execute("VACUUM")
+        with self.lock, self.get_connection() as conn:
+            conn.execute("VACUUM")
 
     def maintain_database(self):
         """Perform regular database maintenance."""
@@ -282,8 +282,8 @@ class DatabaseHelper:
 
     def update_score(self):
         """Update the score."""
-        today = date.today().isoformat()
-        now = datetime.now()
+        today = datetime.now(tz=TZ).date().isoformat()
+        now = datetime.now(tz=TZ)
         with sqlite3.connect(self.db_file) as conn:
             cursor = conn.cursor()
             cursor.execute(
@@ -301,9 +301,9 @@ class DatabaseHelper:
             )
             conn.commit()
 
-    def get_daily_score(self):
+    def get_daily_score(self) -> int:
         """Get today's daily score."""
-        today = date.today().isoformat()
+        today = datetime.now(tz=TZ).date().isoformat()
         with sqlite3.connect(self.db_file) as conn:
             cursor = conn.cursor()
             cursor.execute("SELECT score FROM daily_scores WHERE date = ?", (today,))
@@ -321,17 +321,17 @@ class DatabaseHelper:
 
             self.logger.info("Recent Bug Zapping Scores:")
             for row in results:
-                self.logger.info(f"{row[0]}: {row[1]} kills")
+                self.logger.info("%s: %s kills", row[0], row[1])
 
             # All-time high score
             cursor.execute("SELECT MAX(score), date FROM daily_scores")
             max_score, max_date = cursor.fetchone()
-            self.logger.info(f"All-time high score: {max_score} kills on {max_date}")
+            self.logger.info("All-time high score: %s kills on %s", max_score, max_date)
 
             # Average daily kills
             cursor.execute("SELECT AVG(score) FROM daily_scores")
             avg_score = cursor.fetchone()[0]
-            self.logger.info(f"Average daily kills: {avg_score:.2f}")
+            self.logger.info("Average daily kills: %.2f", avg_score)
 
             # Busiest hour
             cursor.execute("""
@@ -342,9 +342,9 @@ class DatabaseHelper:
             LIMIT 1
             """)
             busiest_hour, kill_count = cursor.fetchone()
-            self.logger.info(f"Busiest hour: {busiest_hour}:00 with {kill_count} kills")
+            self.logger.info("Busiest hour: %d:00 with %d kills", busiest_hour, kill_count)
 
-    def get_hourly_distribution(self):
+    def get_hourly_distribution(self) -> list[tuple]:
         """Get hourly distribution."""
         with sqlite3.connect(self.db_file) as conn:
             cursor = conn.cursor()
@@ -361,4 +361,4 @@ class DatabaseHelper:
         distribution = self.get_hourly_distribution()
         self.logger.info("Hourly Kill Distribution:")
         for hour, count in distribution:
-            self.logger.info(f"{hour:02d}:00 - {count} kills")
+            self.logger.info("%02d:00 - %s kills", hour, count)

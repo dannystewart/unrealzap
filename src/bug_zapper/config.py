@@ -1,16 +1,18 @@
+from __future__ import annotations
+
 import json
-import os
 import threading
 import time
+from pathlib import Path
 
-from dsutil.log import LocalLogger
+from polykit.log import PolyLog
 
 
 class ConfigManager:
     """Manage configuration values."""
 
     def __init__(self):
-        self.logger = LocalLogger.setup_logger(self.__class__.__name__, message_only=True)
+        self.logger = PolyLog.get_logger(self.__class__.__name__, simple=True)
 
         # Config file
         self.config_file = "config.json"
@@ -37,8 +39,8 @@ class ConfigManager:
 
     def load_config(self) -> None:
         """Load configuration from file."""
-        if os.path.exists(self.config_file):
-            with open(self.config_file) as f:
+        if Path(self.config_file).exists():
+            with Path(self.config_file).open(encoding="utf-8") as f:
                 config = json.load(f)
             self.logging_threshold = config.get("logging_threshold", 0.0)
             self.trigger_threshold = config.get("trigger_threshold", 120.0)

@@ -1,4 +1,5 @@
-import logging
+from __future__ import annotations
+
 import sys
 import threading
 import time
@@ -6,28 +7,30 @@ from collections import deque
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from audio_helper import AudioHelper
-from config import ConfigManager
-from dsutil.log import LocalLogger
-from dsutil.shell import get_single_char_input
-from dsutil.text import color
-from time_tracker import TimeTracker
+from polykit.cli import get_single_char_input
+from polykit.formatters import TZ, color
+from polykit.log import PolyLog
+
+from bug_zapper.audio_helper import AudioHelper
+from bug_zapper.config import ConfigManager
+from bug_zapper.time_tracker import TimeTracker
 
 if TYPE_CHECKING:
-    from db_helper import DatabaseHelper
+    from bug_zapper.db_helper import DatabaseHelper
 
 
 class KillTracker:
     """Track kills."""
 
-    def __init__(self, test_mode: bool, db_helper: "DatabaseHelper") -> None:
+    def __init__(self, test_mode: bool, db_helper: DatabaseHelper) -> None:
         self.test_mode = test_mode
-        self.logger = LocalLogger.setup_logger(self.__class__.__name__, message_only=True)
+        self.logger = PolyLog.get_logger(self.__class__.__name__, simple=True)
         self.config = ConfigManager()
         self.db_helper = db_helper
         self.time = TimeTracker(self)
         self.audio = AudioHelper(self, db_helper)
         self.kill_count = 0
+        self.multi_kill_count = 0
         self.zap_queue = deque(maxlen=100)  # Store last 100 zap times
 
         # Set up threaded database maintenance
@@ -36,16 +39,13 @@ class KillTracker:
 
     def handle_kill(self) -> None:
         """Handle a single kill event."""
-        now = datetime.now()
+        now = datetime.now(tz=TZ)
 
         if self.time.in_cooldown(now):
             self.logger.debug("Detection ignored due to cooldown period.")
             return
 
         if self.time.during_quiet_hours():
-            self.rate_limited_log(
-                "Zap detected during quiet hours. Not counting kill.", logging.DEBUG
-            )
             return
 
         if not self.handle_multi_kill(now):
@@ -78,7 +78,10 @@ class KillTracker:
             self.multi_kill_count += 1
             if self.multi_kill_count in [sound[2] for sound in self.audio.multi_kill_sounds]:
                 sound = next(
-                    filter(lambda x: x[2] == self.multi_kill_count, self.audio.multi_kill_sounds)
+                    filter(
+                        lambda x: x[2] == self.multi_kill_count,
+                        self.audio.multi_kill_sounds,
+                    )
                 )
                 self.audio.play_sound(sound[1], sound[0])
             return True
@@ -87,9 +90,9 @@ class KillTracker:
     def handle_test_mode(self) -> None:
         """Run the program in test mode."""
 
-        def check_expirations(self) -> None:
+        def check_expirations() -> None:
             while True:
-                self.time.check.multi_kill_window()
+                self.time.check_multi_kill_window()
                 self.time.reset_kills()
                 time.sleep(1)
 
@@ -138,7 +141,7 @@ class KillTracker:
                 self.db_helper.maintain_database()
                 self.logger.info("Database maintenance completed.")
             except Exception as e:
-                self.logger.error(f"Error during database maintenance: {str(e)}")
+                self.logger.error("Error during database maintenance: %s", str(e))
 
             # Sleep for 1 hour before next maintenance
             time.sleep(3600)

@@ -1,24 +1,25 @@
+from __future__ import annotations
+
 from typing import TYPE_CHECKING
 
 import alsaaudio  # type: ignore # noqa: I201
 import numpy as np
 import pygame
+from polykit.formatters import color
+from polykit.log import PolyLog
 from scipy.fftpack import fft
 from scipy.signal import find_peaks
-from termcolor import colored
-
-from dsutil.log import LocalLogger
 
 if TYPE_CHECKING:
-    from db_helper import DatabaseHelper
-    from kill_tracker import KillTracker
+    from bug_zapper.db_helper import DatabaseHelper
+    from bug_zapper.kill_tracker import KillTracker
 
 
 class AudioHelper:
     """Helper class for audio handling."""
 
-    def __init__(self, kill_tracker: "KillTracker", db_helper: "DatabaseHelper"):
-        self.logger = LocalLogger.setup_logger(self.__class__.__name__, message_only=True)
+    def __init__(self, kill_tracker: KillTracker, db_helper: DatabaseHelper):
+        self.logger = PolyLog.get_logger(self.__class__.__name__, simple=True)
         self.db_helper = db_helper
 
         self.kill_tracker = kill_tracker
@@ -84,13 +85,13 @@ class AudioHelper:
         except pygame.error as e:
             self.logger.error("Failed to play sound: %s", str(e))
             if "mixer not initialized" in str(e):
-                if self.reinit_mixer():
+                if self.init_mixer():
                     self.logger.info("Retrying to play sound after mixer reinitialization.")
                     self.play_sound(file, label)
                 else:
                     self.logger.error("Unable to reinitialize mixer. Sound playback failed.")
 
-    def analyze_frequency(self, audio_data):
+    def analyze_frequency(self, audio_data: np.ndarray) -> tuple[float, float, float, float]:
         """Analyze the frequency of sound data."""
         # Perform FFT
         fft_result = fft(audio_data)
@@ -116,8 +117,8 @@ class AudioHelper:
 
         return dominant_freq, low_freq_energy, mid_freq_energy, high_freq_energy
 
-    def detect_zap(self, audio_data):
-        """Detect zaps based on frequency analysis, waveform shape, and sharp attack with quick decay."""
+    def detect_zap(self, audio_data: np.ndarray) -> bool:
+        """Detect zaps based on frequency, waveform shape, and sharp attack with quick decay."""
         # Duration check
         duration = len(audio_data) / self.sample_rate
         if duration > 0.1:  # Longer than 100ms
@@ -170,7 +171,7 @@ class AudioHelper:
         )
 
         # Determine if it's a zap based on our criteria
-        is_zap = (
+        return (
             dominant_freq >= 5000
             and high_energy_ratio >= 0.5
             and len(peaks) == 1
@@ -178,9 +179,7 @@ class AudioHelper:
             and (decay_time is not None and decay_time <= 0.05)
         )
 
-        return is_zap
-
-    def audio_callback(self, in_data, frames, time_info, status) -> None:  # noqa: ARG001,ARG002
+    def audio_callback(self, in_data, frames, time_info, status) -> None:  # type: ignore # noqa: ARG001,ARG002
         """Audio callback function to handle the audio input."""
         if status:
             self.logger.debug("Status: %s", status)
@@ -216,7 +215,7 @@ class AudioHelper:
             self.logger.debug("Volume: %s", volume)
 
         if self.detect_zap(audio_data):
-            self.logger.info(colored("Zap detected!", "red"))
+            self.logger.info(color("Zap detected!", "red"))
             self.kill_tracker.handle_kill()
 
     def reset_internal_state(self) -> None:
