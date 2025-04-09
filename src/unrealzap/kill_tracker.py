@@ -11,12 +11,12 @@ from polykit.cli import get_single_char_input
 from polykit.formatters import TZ, color
 from polykit.log import PolyLog
 
-from bug_zapper.audio_helper import AudioHelper
-from bug_zapper.config import ConfigManager
-from bug_zapper.time_tracker import TimeTracker
+from unrealzap.audio_helper import AudioHelper
+from unrealzap.config import ConfigManager
+from unrealzap.time_tracker import TimeTracker
 
 if TYPE_CHECKING:
-    from bug_zapper.db_helper import DatabaseHelper
+    from unrealzap.db_helper import DatabaseHelper
 
 
 class KillTracker:

@@ -10,7 +10,7 @@ from polykit.formatters import TZ
 from polykit.log import PolyLog
 
 if TYPE_CHECKING:
-    from bug_zapper.kill_tracker import KillTracker
+    from unrealzap.kill_tracker import KillTracker
 
 
 class TimeTracker:

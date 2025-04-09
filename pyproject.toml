@@ -1,5 +1,5 @@
 [project]
-name = "bug-zapper"
+name = "unrealzap"
 version = "0.1.0"
 description = "Unreal Tournament bug zapper"
 authors = [{ name = "Danny Stewart", email = "danny@stewart.cc" }]

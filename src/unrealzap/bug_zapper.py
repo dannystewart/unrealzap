@@ -8,8 +8,8 @@ import sys
 
 from polykit.log import PolyLog
 
-from bug_zapper.db_helper import DatabaseHelper
-from bug_zapper.kill_tracker import KillTracker
+from unrealzap.db_helper import DatabaseHelper
+from unrealzap.kill_tracker import KillTracker
 
 # Set TEST_MODE to True for testing mode (manual trigger)
 TEST_MODE = False

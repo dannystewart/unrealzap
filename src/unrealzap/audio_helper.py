@@ -11,8 +11,8 @@ from scipy.fftpack import fft
 from scipy.signal import find_peaks
 
 if TYPE_CHECKING:
-    from bug_zapper.db_helper import DatabaseHelper
-    from bug_zapper.kill_tracker import KillTracker
+    from unrealzap.db_helper import DatabaseHelper
+    from unrealzap.kill_tracker import KillTracker
 
 
 class AudioHelper:
